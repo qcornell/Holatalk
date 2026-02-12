@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 
 export default function App() {
   const [pingResult, setPingResult] = useState<string>("Waiting...");
+  const [cppResult, setCppResult] = useState<string>("Waiting...");
 
   useEffect(() => {
     async function checkNative() {
@@ -16,6 +17,16 @@ export default function App() {
           console.error("❌ Native Error:", e);
           setPingResult("Error: " + (e as Error).message);
         }
+
+        try {
+          console.log("🤠 Calling GlassesModule.helloFromCpp()...");
+          const res = await NativeModules.GlassesModule.helloFromCpp();
+          console.log("✅ C++ Response:", res);
+          setCppResult(res);
+        } catch (e) {
+          console.error("❌ C++ Error:", e);
+          setCppResult("Error: " + (e as Error).message);
+        }
       }
     }
     checkNative();
@@ -25,6 +36,8 @@ export default function App() {
     <View style={styles.container}>
       <Text style={styles.text}>Native Module Status:</Text>
       <Text style={styles.result}>{pingResult}</Text>
+      <Text style={styles.text}>C++ Status:</Text>
+      <Text style={styles.result}>{cppResult}</Text>
     </View>
   );
 }

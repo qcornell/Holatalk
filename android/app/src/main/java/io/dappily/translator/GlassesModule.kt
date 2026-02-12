@@ -7,16 +7,38 @@ import com.facebook.react.bridge.Promise
 
 class GlassesModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaModule(reactContext) {
 
-    override fun getName(): String {
-        return "GlassesModule"
+    companion object {
+        var nativeLoaded = false
+        init {
+            try {
+                System.loadLibrary("dappily_native")
+                nativeLoaded = true
+            } catch (e: UnsatisfiedLinkError) {
+                nativeLoaded = false
+            }
+        }
     }
+
+    override fun getName(): String = "GlassesModule"
+
+    private external fun nativeHello(): String
 
     @ReactMethod
     fun ping(promise: Promise) {
+        promise.resolve("pong from android native")
+    }
+
+    @ReactMethod
+    fun helloFromCpp(promise: Promise) {
+        if (!nativeLoaded) {
+            promise.reject("CPP_ERROR", "Native library failed to load")
+            return
+        }
         try {
-            promise.resolve("Pong from Android Native! 👓")
+            val result = nativeHello()
+            promise.resolve(result)
         } catch (e: Exception) {
-            promise.reject("ERROR", e)
+            promise.reject("CPP_ERROR", e.message)
         }
     }
 }
