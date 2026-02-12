@@ -1,0 +1,24 @@
+﻿node_modules/
+.expo/
+dist/
+web-build/
+
+# Native Builds
+android/app/build/
+android/app/src/main/assets/
+android/.gradle
+android/local.properties
+ios/Pods/
+ios/build/
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+base.apk
+
+expo-native-glasses-template-backup.tar.gz
+
+base.apk
+
+expo-native-glasses-template-backup.tar.gz
