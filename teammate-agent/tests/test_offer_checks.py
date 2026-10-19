@@ -198,3 +198,10 @@ def test_transcription_settings_fit_the_model():
     assert new.languages == ["es", "en"] and "Max" in new.keywords and new.prompt is None
     old = agent.transcription_settings(PB, "gpt-4o-transcribe")
     assert old.languages is None and old.keywords is None and "Max" in old.prompt
+
+
+def test_ana_switches_to_english_when_the_rep_asks():
+    text = PB.instructions(NOW)
+    assert "If Max asks you to speak English" in text and "switch right away" in text
+    assert "Max, they'd like English. Do you want to take it, or should I keep going in English?" in text
+    assert "Always answer the customer in Spanish" not in text
