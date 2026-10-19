@@ -1,0 +1,28 @@
+[
+  {
+    "id": "OBJ_CREDIT_CHECK",
+    "category": "credit_id",
+    "triggers_es": ["¿checan crédito?", "¿van a correr mi crédito?", "no quiero que me afecte el crédito", "mi crédito no es muy bueno", "mi crédito está mal"],
+    "spanglish": ["do you check credit?", "credit check?"],
+    "meaning_en": "Worried about credit score impact or bad credit rejection.",
+    "coaching_en": "🪪 SENSITIVE — Reassure firmly. No judgment.",
+    "responses_es": [
+      "No checamos crédito. No le afecta en nada. Es muy sencillo."
+    ],
+    "exit_now": false,
+    "max_attempts": 1
+  },
+  {
+    "id": "OBJ_NO_ID",
+    "category": "credit_id",
+    "triggers_es": ["no tengo ID de aquí", "solo tengo matrícula", "solo tengo pasaporte mexicano", "¿sirve el ITIN?", "no tengo papeles", "no tengo seguro social", "¿necesitan social?"],
+    "spanglish": ["no tengo ID", "do you need social security?"],
+    "meaning_en": "Undocumented or limited ID. Very sensitive — handle with care.",
+    "coaching_en": "🪪 VERY SENSITIVE — Never push. List what you accept. Make them feel safe.",
+    "responses_es": [
+      "No se preocupe. Aceptamos matrícula, ITIN, o pasaporte. Su información está completamente segura con nosotros."
+    ],
+    "exit_now": false,
+    "max_attempts": 1
+  }
+]

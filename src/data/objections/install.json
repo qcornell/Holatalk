@@ -1,0 +1,29 @@
+[
+  {
+    "id": "OBJ_INSTALL_TIMING",
+    "category": "install",
+    "triggers_es": ["¿cuánto tarda la instalación?", "¿cuándo instalan?", "no quiero esperar mucho", "¿tienen que hacer hoyos?", "¿van a abrir paredes?"],
+    "spanglish": ["how long is the install?", "when can you install?"],
+    "meaning_en": "Worried about install timeline or damage to home.",
+    "coaching_en": "Explain quick/simple install. Modem ships via FedEx, self-install with QR code.",
+    "responses_es": [
+      "Le mandamos el módem por FedEx, llega en 2 días. Solo conecta un cable y escanea un código. No tienen que venir a su casa.",
+      "La instalación es muy sencilla. No se hacen hoyos ni nada. Solo conectar y listo."
+    ],
+    "exit_now": false,
+    "max_attempts": 1
+  },
+  {
+    "id": "OBJ_LOSE_SERVICE",
+    "category": "install",
+    "triggers_es": ["¿me quedo sin internet?", "¿cuánto tiempo me quedo sin servicio?", "¿hay un período sin internet?", "no me quiero quedar sin wifi"],
+    "spanglish": ["will I lose internet?", "gap in service?"],
+    "meaning_en": "Worried about downtime between old and new service.",
+    "coaching_en": "Explain they keep old service until new one is active. No gap.",
+    "responses_es": [
+      "Puede cancelar su otro servicio después de que ya tenga el nuestro funcionando. No se queda sin nada."
+    ],
+    "exit_now": false,
+    "max_attempts": 1
+  }
+]

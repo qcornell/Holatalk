@@ -1,0 +1,21 @@
+{
+  "intent": "trust_scam",
+  "spanish_variations": [
+    "esto es una estafa",
+    "no confío",
+    "suena falso",
+    "no creo que sea real",
+    "me han engañado antes",
+    "cómo sé que es verdad",
+    "necesito prueba",
+    "no me fío"
+  ],
+  "rep_response_chunks_es": [
+    "Te entiendo completamente.",
+    "Aquí está mi identificación.",
+    "Puedes llamar a la compañía para verificar."
+  ],
+  "rep_response_en_summary": "Acknowledge. Show ID. Offer verification call.",
+  "is_hard_stop": false,
+  "max_attempts": 1
+}

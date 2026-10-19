@@ -1,0 +1,20 @@
+{
+  "intent": "renter_owner",
+  "spanish_variations": [
+    "no soy el dueño",
+    "soy inquilino",
+    "rento la casa",
+    "tengo que preguntar al dueño",
+    "no puedo hacer cambios",
+    "no es mi casa",
+    "el dueño decide"
+  ],
+  "rep_response_chunks_es": [
+    "No hay problema.",
+    "No necesitas permiso para Internet.",
+    "Es tu servicio personal."
+  ],
+  "rep_response_en_summary": "No problem. No permission needed. Personal service.",
+  "is_hard_stop": false,
+  "max_attempts": 1
+}

@@ -1,0 +1,41 @@
+[
+  {
+    "id": "OBJ_CONTRACT",
+    "category": "contract",
+    "triggers_es": ["¿hay contrato?", "¿tiene contrato?", "¿es con contrato?", "¿me amarra contrato?", "no quiero contrato", "no me gustan los contratos"],
+    "spanglish": ["is there a contract?", "no quiero contract"],
+    "meaning_en": "Burned before. Need reassurance.",
+    "coaching_en": "Emphasize NO CONTRACT. This is your #1 weapon.",
+    "responses_es": [
+      "No hay contrato. Se puede salir cuando quiera, sin multa, sin penalidad. Pruébelo y si no le gusta, cancela."
+    ],
+    "exit_now": false,
+    "max_attempts": 1
+  },
+  {
+    "id": "OBJ_CANCEL_FEE",
+    "category": "contract",
+    "triggers_es": ["¿hay penalidad?", "¿hay multa?", "¿cobran por cancelar?", "¿qué pasa si cancelo?", "¿puedo cancelar cuando quiera?"],
+    "spanglish": ["early termination fee?", "cancellation fee?"],
+    "meaning_en": "Want to know the exit cost.",
+    "coaching_en": "Be honest. If no fee, emphasize it hard.",
+    "responses_es": [
+      "Puede cancelar cuando quiera. No hay cargo por cancelación."
+    ],
+    "exit_now": false,
+    "max_attempts": 1
+  },
+  {
+    "id": "OBJ_LOCKED_IN",
+    "category": "contract",
+    "triggers_es": ["ya tengo contrato", "todavía estoy en contrato", "me faltan meses", "me cobran si cancelo"],
+    "spanglish": ["i'm still in a contract", "estoy locked in"],
+    "meaning_en": "Stuck with current provider. Might be interested but can't switch.",
+    "coaching_en": "Ask when contract ends. Plant the seed. Leave info for when they're free.",
+    "responses_es": [
+      "¿Cuándo se le vence el contrato? Le dejo mi información para cuando esté listo. Guárdela."
+    ],
+    "exit_now": false,
+    "max_attempts": 1
+  }
+]

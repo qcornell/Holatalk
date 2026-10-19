@@ -7,7 +7,11 @@ import com.facebook.react.uimanager.ViewManager
 
 class GlassesPackage : ReactPackage {
     override fun createNativeModules(reactContext: ReactApplicationContext): List<NativeModule> {
-        return listOf(GlassesModule(reactContext))
+        return listOf(
+            GlassesModule(reactContext),
+            AudioRouterModule(reactContext),
+            RoutedTTSModule(reactContext),
+        )
     }
 
     override fun createViewManagers(reactContext: ReactApplicationContext): List<ViewManager<*, *>> {

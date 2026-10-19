@@ -1,0 +1,20 @@
+{
+  "intent": "contract",
+  "spanish_variations": [
+    "no quiero contrato",
+    "no me gustan los contratos",
+    "cuánto dura el contrato",
+    "puedo cancelar",
+    "qué pasa si me mudo",
+    "no quiero comprometerme tanto tiempo",
+    "no firmo contratos"
+  ],
+  "rep_response_chunks_es": [
+    "Te entiendo.",
+    "El contrato es solo para asegurar tu tarifa baja.",
+    "Si te mudas, lo cancelamos sin problema."
+  ],
+  "rep_response_en_summary": "Acknowledge. Contract locks in low rate. Easy cancellation if moving.",
+  "is_hard_stop": false,
+  "max_attempts": 1
+}

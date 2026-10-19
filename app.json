@@ -1,31 +1,56 @@
 {
   "expo": {
-    "name": "DappilyDirector",
-    "slug": "DappilyDirector",
+    "name": "Hola D2D",
+    "slug": "HolaD2D",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
+    "plugins": [
+      "./plugins/withWhisperCpp",
+      "expo-iap"
+    ],
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#F5F6FB"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "io.dappily.translator",
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "Hola D2D needs microphone access to listen and translate conversations in real-time.",
+        "UIBackgroundModes": [
+          "audio",
+          "audio"
+        ],
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "runtimeVersion": {
+        "policy": "appVersion"
+      }
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "foregroundImage": "./assets/icon.png",
+        "backgroundColor": "#F59E0B"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "io.dappily.translator"
+      "package": "io.dappily.translator",
+      "runtimeVersion": "1.0.0"
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/icon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "3a27d744-8b84-44eb-9398-869c118b8110"
+      }
+    },
+    "updates": {
+      "url": "https://u.expo.dev/3a27d744-8b84-44eb-9398-869c118b8110"
     }
   }
 }

@@ -1,0 +1,20 @@
+{
+  "intent": "decision_maker",
+  "spanish_variations": [
+    "tengo que preguntar a mi esposa",
+    "mi esposo decide eso",
+    "necesito hablar con mi familia",
+    "no soy yo quien decide",
+    "mi pareja tiene que verlo",
+    "debo consultarlo",
+    "no puedo decidir solo"
+  ],
+  "rep_response_chunks_es": [
+    "Perfecto.",
+    "¿Está en casa ahora?",
+    "Podemos hablar con los dos juntos."
+  ],
+  "rep_response_en_summary": "Good. Are they home? Speak to both together.",
+  "is_hard_stop": false,
+  "max_attempts": 1
+}

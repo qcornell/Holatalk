@@ -1,0 +1,20 @@
+{
+  "intent": "install",
+  "spanish_variations": [
+    "cuándo pueden venir",
+    "tienen cita pronto",
+    "cuánto tarda la instalación",
+    "no puedo esperar tanto",
+    "no tengo tiempo",
+    "trabajo mucho",
+    "cuándo es la cita"
+  ],
+  "rep_response_chunks_es": [
+    "Puedo ver la agenda.",
+    "Tenemos citas esta semana.",
+    "¿Qué día te viene mejor?"
+  ],
+  "rep_response_en_summary": "Check schedule. This week available. Ask preference.",
+  "is_hard_stop": false,
+  "max_attempts": 1
+}

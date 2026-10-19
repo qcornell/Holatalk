@@ -1,0 +1,21 @@
+{
+  "intent": "price",
+  "spanish_variations": [
+    "es muy caro",
+    "no tengo dinero",
+    "está fuera de mi presupuesto",
+    "cuesta demasiado",
+    "no puedo pagarlo",
+    "es mucho dinero",
+    "no lo puedo pagar",
+    "demasiado costoso"
+  ],
+  "rep_response_chunks_es": [
+    "Entiendo.",
+    "Pero piensa en cuánto ahorrarás cada mes.",
+    "¿Y si te dijera que puedes empezar sin pago inicial?"
+  ],
+  "rep_response_en_summary": "Acknowledge. Frame as savings. Offer zero down.",
+  "is_hard_stop": false,
+  "max_attempts": 1
+}

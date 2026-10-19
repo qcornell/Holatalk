@@ -1,0 +1,42 @@
+[
+  {
+    "id": "OBJ_TOO_EXPENSIVE",
+    "category": "price",
+    "triggers_es": ["está muy caro", "es mucho", "no puedo pagar eso", "no tengo dinero", "no me alcanza", "está fuera de mi presupuesto"],
+    "spanglish": ["it's too much", "es too expensive", "too pricey"],
+    "meaning_en": "Price resistance. Might be real or might be testing.",
+    "coaching_en": "Break it down per day. Compare to what they pay now. Mention the cheapest plan.",
+    "responses_es": [
+      "Sale a menos de $2 al día. ¿Cuánto paga ahorita? Probablemente le estamos ahorrando dinero.",
+      "Entiendo. Pero considere que no sube de precio. Lo que paga hoy es lo que paga siempre."
+    ],
+    "exit_now": false,
+    "max_attempts": 2
+  },
+  {
+    "id": "OBJ_PRICE_INCREASE",
+    "category": "price",
+    "triggers_es": ["¿después sube el precio?", "¿me van a subir?", "¿es el mismo precio siempre?", "¿es precio fijo?"],
+    "spanglish": ["does the price go up?", "is it the same price?"],
+    "meaning_en": "Burned by promo-then-hike before. Smart customer.",
+    "coaching_en": "Be honest about pricing. If price is locked, say so.",
+    "responses_es": [
+      "El precio que le doy es el precio que paga. Sin sorpresas."
+    ],
+    "exit_now": false,
+    "max_attempts": 1
+  },
+  {
+    "id": "OBJ_HIDDEN_FEES",
+    "category": "price",
+    "triggers_es": ["¿hay cargos escondidos?", "¿hay costos extra?", "¿cobran algo más?", "¿hay cargos adicionales?"],
+    "spanglish": ["hidden fees?", "extra charges?"],
+    "meaning_en": "Worried about surprise charges on the bill.",
+    "coaching_en": "Be transparent. List exactly what they'll see on the bill.",
+    "responses_es": [
+      "No hay cargos escondidos. Su factura es exactamente lo que le dije — sin sorpresas."
+    ],
+    "exit_now": false,
+    "max_attempts": 1
+  }
+]

@@ -1,0 +1,19 @@
+{
+  "intent": "already_have_internet",
+  "spanish_variations": [
+    "ya tengo internet",
+    "no necesito otro",
+    "estoy bien con mi servicio",
+    "ya pago por internet",
+    "tengo proveedor",
+    "no quiero cambiar"
+  ],
+  "rep_response_chunks_es": [
+    "Claro.",
+    "¿Cuánto pagas ahora?",
+    "Esto es más rápido y más barato."
+  ],
+  "rep_response_en_summary": "Understood. How much now? This is faster + cheaper.",
+  "is_hard_stop": false,
+  "max_attempts": 1
+}

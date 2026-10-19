@@ -1,0 +1,17 @@
+[project]
+name = "Hola Translator"
+
+[api]
+enabled = true
+port = 54321
+max_rows = 1000
+
+[db]
+port = 54322
+
+[studio]
+enabled = true
+port = 54323
+
+[auth]
+enabled = true

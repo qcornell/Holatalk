@@ -22,3 +22,9 @@ expo-native-glasses-template-backup.tar.gz
 base.apk
 
 expo-native-glasses-template-backup.tar.gz
+
+# Signing keys (keep out of git)
+android/app/*-release.keystore
+*.jks
+*.p8
+*.p12

@@ -1,0 +1,42 @@
+[
+  {
+    "id": "OBJ_SCAM",
+    "category": "trust",
+    "triggers_es": ["¿es una estafa?", "¿esto es real?", "¿me quieren robar?", "no confío", "¿tienen licencia?", "¿cómo sé que es verdad?", "suena demasiado bueno", "¿usted trabaja para la compañía?", "¿tiene identificación?"],
+    "spanglish": ["is this a scam?", "sounds too good", "do you have ID?"],
+    "meaning_en": "Don't trust door-to-door. Been burned or heard stories.",
+    "coaching_en": "Show your badge/ID. Mention the company website. Be transparent.",
+    "responses_es": [
+      "Entiendo su preocupación. Aquí tiene mi identificación. Puede verificar todo en nuestra página web. Somos una empresa con licencia.",
+      "Mire, aquí está mi gafete. Si quiere puede llamar al número de la empresa para confirmar."
+    ],
+    "exit_now": false,
+    "max_attempts": 2
+  },
+  {
+    "id": "OBJ_THINK_ABOUT_IT",
+    "category": "trust",
+    "triggers_es": ["déjeme pensarlo", "voy a pensarlo", "lo voy a pensar", "necesito pensarlo", "deme tiempo", "lo tengo que pensar"],
+    "spanglish": ["let me think about it", "need to think"],
+    "meaning_en": "Stalling. Usually means no but doesn't want confrontation.",
+    "coaching_en": "Create urgency without pressure. Mention promo expiring. Try to get a callback.",
+    "responses_es": [
+      "Claro que sí. Solo le comento que esta promoción es por tiempo limitado. ¿Le puedo dejar mi número por si se decide?"
+    ],
+    "exit_now": false,
+    "max_attempts": 1
+  },
+  {
+    "id": "OBJ_DATA_PRIVACY",
+    "category": "trust",
+    "triggers_es": ["no quiero dar mis datos", "¿es seguro dar mi información?", "no confío", "¿qué hacen con mi información?", "no quiero dar mi número"],
+    "spanglish": ["is my info safe?", "what do you do with my data?"],
+    "meaning_en": "Trust issue. Need to feel their data is protected.",
+    "coaching_en": "Reassure about data security. Mention the company is legitimate.",
+    "responses_es": [
+      "Su información solo se usa para crear su cuenta. No la compartimos con nadie. Somos una empresa registrada."
+    ],
+    "exit_now": false,
+    "max_attempts": 1
+  }
+]

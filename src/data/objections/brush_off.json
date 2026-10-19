@@ -1,0 +1,42 @@
+[
+  {
+    "id": "OBJ_NOT_INTERESTED",
+    "category": "brush_off",
+    "triggers_es": ["no me interesa", "no gracias", "estoy bien", "estoy bien así", "no necesito", "no necesito nada", "no ocupo", "ahorita no", "no quiero"],
+    "spanglish": ["no thanks", "i'm good", "estoy good"],
+    "meaning_en": "Default brush-off. Usually automatic, not a real decision.",
+    "coaching_en": "Don't argue. Acknowledge, then leave a hook. 'Can I just leave you info in case your price goes up?'",
+    "responses_es": [
+      "Lo entiendo. ¿Le puedo dejar la información por si acaso? No le cuesta nada.",
+      "Está bien, no hay problema. Solo le pregunto — ¿cuánto paga ahorita de internet?"
+    ],
+    "exit_now": false,
+    "max_attempts": 2
+  },
+  {
+    "id": "OBJ_TOO_BUSY",
+    "category": "brush_off",
+    "triggers_es": ["estoy ocupado", "estoy ocupada", "no tengo tiempo", "ahorita estoy en algo", "estoy cocinando", "estoy comiendo"],
+    "spanglish": ["i'm busy", "no time"],
+    "meaning_en": "They're genuinely busy or using it as an excuse.",
+    "coaching_en": "Respect their time. Ask for a better time to come back.",
+    "responses_es": [
+      "Disculpe la molestia. ¿Cuándo sería un mejor momento para pasar? Solo toma unos minutos."
+    ],
+    "exit_now": false,
+    "max_attempts": 1
+  },
+  {
+    "id": "OBJ_HARD_NO",
+    "category": "brush_off",
+    "triggers_es": ["ya le dije que no", "no es no", "váyase", "no me moleste", "largo de aquí", "no quiero nada", "ya déjeme en paz"],
+    "spanglish": ["i said no", "leave me alone", "get out"],
+    "meaning_en": "Hard stop. Customer is firm or getting agitated.",
+    "coaching_en": "⛔ STOP. Do NOT push. Thank them and leave immediately. Burning this bridge hurts the whole team.",
+    "responses_es": [
+      "Disculpe la molestia. Que tenga un excelente día."
+    ],
+    "exit_now": true,
+    "max_attempts": 0
+  }
+]

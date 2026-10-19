@@ -1,0 +1,28 @@
+[
+  {
+    "id": "OBJ_CANCEL_CURRENT",
+    "category": "switching",
+    "triggers_es": ["¿ustedes cancelan mi otro servicio?", "¿yo tengo que cancelar?", "¿cómo cancelo el que tengo?"],
+    "spanglish": ["do you cancel my old service?", "how do I cancel?"],
+    "meaning_en": "Logistics question = near-close. They're thinking about switching.",
+    "coaching_en": "🟢 Near CLOSE — They're thinking logistics. Help them through it.",
+    "responses_es": [
+      "Usted puede llamar a cancelar después de que ya tenga nuestro servicio funcionando. Es muy fácil."
+    ],
+    "exit_now": false,
+    "max_attempts": 1
+  },
+  {
+    "id": "OBJ_HAPPY_WITH_CURRENT",
+    "category": "switching",
+    "triggers_es": ["estoy contento con lo que tengo", "estoy bien con mi servicio", "no me quejo", "ya estoy a gusto", "me funciona bien"],
+    "spanglish": ["i'm happy with what I have", "it works fine"],
+    "meaning_en": "Satisfied with current provider. Hard to move unless you find a hook.",
+    "coaching_en": "Ask what they pay. Often you can beat the price even if service is ok.",
+    "responses_es": [
+      "Me alegro que tenga buen servicio. Solo por curiosidad, ¿cuánto paga al mes? A veces la gente se sorprende de lo que se puede ahorrar."
+    ],
+    "exit_now": false,
+    "max_attempts": 1
+  }
+]

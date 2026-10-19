@@ -1,0 +1,29 @@
+[
+  {
+    "id": "OBJ_SPOUSE_ABSENT",
+    "category": "decision_maker",
+    "triggers_es": ["mi esposo no está", "mi esposa no está", "mi marido no está", "tiene que hablar con mi esposo", "tiene que hablar con mi esposa", "déjeme preguntarle a mi esposo", "déjeme preguntarle a mi esposa", "tengo que consultar con mi pareja"],
+    "spanglish": ["my husband no está", "let me ask mi esposo", "my wife isn't here"],
+    "meaning_en": "Can't decide alone. Might be real or an excuse.",
+    "coaching_en": "Get a callback time. Leave your name + company. Ask when the decision maker is home.",
+    "responses_es": [
+      "¿A qué hora regresa? Con gusto paso de nuevo. ¿Le puedo dejar mi información?",
+      "Entiendo. ¿Le puedo dejar un papelito para que lo vean juntos? Tiene mi número por si tienen preguntas."
+    ],
+    "exit_now": false,
+    "max_attempts": 1
+  },
+  {
+    "id": "OBJ_NOT_OWNER",
+    "category": "decision_maker",
+    "triggers_es": ["no es mi casa", "yo rento aquí", "yo nomás rento", "es la casa de mi mamá", "yo no soy el dueño", "yo no soy la dueña", "no soy el responsable"],
+    "spanglish": ["i just rent here", "it's not my house"],
+    "meaning_en": "Renter, not homeowner. May think they can't get service.",
+    "coaching_en": "Renters CAN get service! Explain that.",
+    "responses_es": [
+      "No importa si renta. El servicio se pone a su nombre, no al del dueño. Es para usted."
+    ],
+    "exit_now": false,
+    "max_attempts": 1
+  }
+]
