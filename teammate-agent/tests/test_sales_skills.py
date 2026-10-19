@@ -33,3 +33,18 @@ def test_example_lines_never_contain_their_own_amounts():
     # every amount Hola says must come from the rep's facts, so the shipped lines carry none
     for _, _, reply in BRUSH_OFFS:
         assert amounts_in_text(reply.replace("{price}", "")) == []
+
+
+def test_four_door_types_come_first():
+    text = PB.instructions(datetime(2026, 10, 19, 15, 0))
+    assert text.index("The 4 door types") < text.index("Common brush-offs")
+    assert "¿Tiene alguna tele inteligente en casa" in text  # no-TV check before leaving
+    assert "Y si fuera solo su decisión" in text  # roommate stall test
+    assert "Never set a callback for a stall" in text
+
+
+def test_door_type_lines_never_contain_their_own_amounts():
+    from sales_skills import DOOR_TYPES
+    for t in DOOR_TYPES:
+        for step in t["steps"]:
+            assert amounts_in_text(str(step).replace("{price}", "")) == []

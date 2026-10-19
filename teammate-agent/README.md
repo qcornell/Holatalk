@@ -58,6 +58,8 @@ Messages arrive on the LiveKit data channel, topic `hola`, as JSON:
 | `lead` | after the sign-up details are confirmed | `fields`: name, phone, email, address, plan |
 | `ask_rep` | when the playbook has no answer | `question` |
 | `flag` | when Hola says an amount it had no source for | `said`, `amounts` |
+| `callback` | a spouse, roommate or owner must decide | `name`, `phone`, `when`, `decision_maker` |
+| `move_on` | no real need, a firm no, or a stall | `reason` |
 | `ended` | after 30 s of silence or the time limit | `reason`, `seconds` |
 
 The phone can send the playbook as job metadata: `{"playbook": {...}, "user_id": "..."}`.

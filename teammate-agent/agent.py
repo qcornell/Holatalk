@@ -185,6 +185,42 @@ class TeammateAgent(Agent):
         return (f"Sent to the rep. Tell the customer: 'Buena pregunta. Déjeme confirmarlo con "
                 f"{self.playbook.rep_name} para darle la respuesta correcta.'")
 
+    @function_tool
+    async def schedule_callback(
+        self, context: RunContext, name: str, phone: str, when: str, decision_maker: str
+    ) -> str:
+        """Save a go-back visit when a spouse, roommate or owner has to decide. Only for real interest, never
+        for a stall, and only with a phone number and a specific day and time.
+
+        Args:
+            name: The customer's name.
+            phone: A phone number for the customer or the person who decides.
+            when: The specific day and time to come back, for example "sábado a las 11".
+            decision_maker: Who decides: spouse, roommate, owner, or other.
+        """
+        digits = re.sub(r"\D", "", phone)
+        if len(digits) == 11 and digits.startswith("1"):
+            digits = digits[1:]
+        if len(digits) != 10:
+            return "Not saved: ask for a phone number with 10 digits."
+        if len(when.strip()) < 3:
+            return "Not saved: ask for a specific day and time to come back."
+        await self.phone.send(
+            "callback", name=name.strip(), phone=digits, when=when.strip(), decision_maker=decision_maker.strip()
+        )
+        return "Saved. Repeat the day and time back to them, thank them, and say goodbye."
+
+    @function_tool
+    async def move_on(self, context: RunContext, reason: str) -> str:
+        """Tell the rep this door is done so they can go to the next one. Use it after a warm goodbye when
+        there is no real need (no smart TV, no kids, no streaming), after a firm second no, or for a stall.
+
+        Args:
+            reason: A few words, for example "no TV, no need", "said no twice", "roommate stall".
+        """
+        await self.phone.send("move_on", reason=reason)
+        return "The rep has been told. Say a warm goodbye if you haven't yet, then stop talking."
+
 
 # ---------------------------------------------------------------- session wiring
 

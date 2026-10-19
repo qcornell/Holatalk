@@ -24,4 +24,4 @@ def test_live_engine_builds_gpt_live():
 def test_both_engines_get_the_same_tools():
     a = agent.TeammateAgent(PB, agent.PhoneBridge(ctx=None))
     names = sorted(t.info.name for t in a.tools)
-    assert names == ["ask_rep", "save_lead", "show_price"]
+    assert names == ["ask_rep", "move_on", "save_lead", "schedule_callback", "show_price"]

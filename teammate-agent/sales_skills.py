@@ -8,6 +8,68 @@ from the rep's facts.
 
 from __future__ import annotations
 
+# The 4 door types reps meet most (from Max, Oct 2026). Hola handles these first and best.
+DOOR_TYPES: list[dict[str, object]] = [
+    {
+        "name": "Happy with their internet and their price",
+        "signs": '"Ya tengo internet y estoy contento", "Pago poco", "Me funciona bien"',
+        "steps": [
+            'Respect it and get the facts: "¡Qué bueno que le funciona! ¿Con qué compañía está, y cuánto paga al mes?"',
+            'If they pay more than your price, show the difference using their number: "Entonces con nosotros '
+            'pagaría {price} al mes, unos [their price minus yours] menos cada mes."',
+            'If they pay the same or less, look for what is hidden: "¿Ese precio ya incluye impuestos y el equipo?" '
+            '"¿Es precio de promoción? ¿Sabe cuándo se le termina?" "¿Le han subido el precio desde que empezó?" '
+            '"¿Tiene contrato con ellos?"',
+            "Compare speed, price lock or contract only with your facts.",
+            'Still happy after two tries: "Perfecto, me da gusto. Si algún día le suben el precio, aquí estamos." '
+            "Then call move_on.",
+        ],
+    },
+    {
+        "name": "Thinks the phone hotspot is enough (very careful with money)",
+        "signs": '"Uso el hotspot", "Tengo datos en el celular", "Es un gasto extra"',
+        "steps": [
+            'Agree with saving money: "Tiene razón en cuidar su dinero."',
+            'Ask: "¿Sus datos son ilimitados, o se le acaban o se le pone lento a fin de mes?" and '
+            '"¿Cuántas personas en su casa usan el internet del celular?"',
+            "Paint the difference: hotspot data runs out and slows down, it is slower for videos and the TV, "
+            "they connect every day, and it drains the phone battery. Home internet connects the whole family "
+            "at once without using anyone's data.",
+            'Frame the price: "Por {price} al mes, toda la familia tiene internet en casa y usted guarda sus datos '
+            'para cuando sale."',
+            "Close: ask for their name and phone number to reserve the install.",
+        ],
+    },
+    {
+        "name": "Doesn't need it (often no TV)",
+        "signs": '"No lo necesito", "No veo televisión", "Solo uso el teléfono para llamar"',
+        "steps": [
+            'Qualify fast with one or two questions: "Le entiendo. ¿Tiene alguna tele inteligente en casa, o alguien '
+            'que vea videos o películas?" "¿Hay niños que usen internet para la escuela?"',
+            'No smart TV, no kids and no streaming: leave right away, no pitch: "Perfecto, entonces por ahora no le '
+            'hace falta. ¡Gracias por su tiempo y que tenga buen día!" Then call move_on.',
+            "If they do have a smart TV, kids or streaming: handle them like the hotspot type.",
+        ],
+    },
+    {
+        "name": "Needs to ask someone (spouse, roommate or owner)",
+        "signs": '"Tengo que hablar con mi esposo", "Tengo que preguntarle a mi compañero", '
+                 '"Tengo que preguntarle al dueño"',
+        "steps": [
+            'Spouse: "Me parece muy bien. ¿Está en casa ahorita? Con gusto les explico a los dos." Not home: get a '
+            "phone number AND a specific day and time to come back, then call schedule_callback.",
+            'Roommate (often a polite way to stall): test it first: "Claro. Y si fuera solo su decisión, ¿usted sí '
+            'lo haría?" and "¿Quién paga el internet en la casa?" Clear yes: "¿Le podemos marcar ahorita? Así lo '
+            'dejamos listo." or get the roommate\'s number and a time, then call schedule_callback. Vague answer '
+            '("no sé", "tal vez"): ask once what is really holding them back; still vague, thank them and call '
+            "move_on. Never set a callback for a stall.",
+            "Owner or landlord: answer only from your facts about renters; if they don't cover it, call ask_rep. "
+            "If the owner must agree, get the owner's number or a time to come back.",
+            "Never set a callback without a phone number and a specific day and time.",
+        ],
+    },
+]
+
 # The probing ladder seasoned reps use.
 LADDER = [
     "Acknowledge kindly first (\"Claro\", \"Le entiendo\", \"Con gusto\"). Never argue.",
@@ -108,7 +170,18 @@ def sales_skills_text(rep: str, company: str, price: str) -> str:
         f'- They say "{says}" ({means}) -> e.g. "{reply.format(**fill)}"' for says, means, reply in BRUSH_OFFS
     )
     stops = "\n".join(f"- {s}" for s in HARD_STOPS)
+    types = "\n\n".join(
+        f"{i}. {t['name']}\nSigns: {t['signs']}\n"
+        + "\n".join(f"   - {str(step).format(**fill)}" for step in t["steps"])  # type: ignore[union-attr]
+        for i, t in enumerate(DOOR_TYPES, 1)
+    )
     return f"""# Sales skills (how a seasoned rep handles the door)
+Your goal is a sign-up, but the rep's time matters too: qualify fast and leave doors with no real need.
+
+## The 4 door types you will meet most. Figure out which one you're at, then follow its steps.
+{types}
+
+## For everything else
 Use this ladder on every brush-off or objection:
 {ladder}
 Give each brush-off at most two friendly tries. Adapt the wording; never read it like a script.
