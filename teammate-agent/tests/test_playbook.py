@@ -26,7 +26,7 @@ def test_greeting_says_it_is_ai_and_fits_time_of_day():
 def test_blank_answers_are_listed_as_unknown_not_invented():
     pb = Playbook.from_file(SAMPLE)
     text = pb.instructions(datetime(2026, 10, 19, 15, 0))
-    assert "Install: Install fee" in text  # listed under "What you do NOT know"
+    assert "Install and paying: Install fee (free / $)" in text  # listed under "What you do NOT know"
     assert "Contract: no" not in text  # no contract policy was given, so none is claimed
 
 

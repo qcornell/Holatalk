@@ -6,8 +6,10 @@ form and any flagged numbers.
 
 - `agent.py`: the agent (LiveKit Agents 1.8)
 - `playbook.py`: turns the rep's setup into Hola's instructions; blank answers become "ask the rep"
+- `sales_skills.py`: Hola's built-in brush-off and objection handling (ships with the app)
 - `number_check.py`: checks every amount Hola says against the playbook
-- `sample_playbook.json`: your playbook. Same items as the "Customer questions" tab in the plan doc
+- `sample_playbook.json`: your playbook, in the same 4 groups as the app setup: Your offer, The rules,
+  Install and paying, Extras
 - `usage.py`: logs minutes per rep to Supabase (optional)
 
 ## Try it on your PC (about 10 minutes)
@@ -22,8 +24,9 @@ Use headphones for this test, so Hola doesn't hear itself through your speakers.
    pip install -r requirements.txt
    ```
 3. Copy `.env.example` to `.env` and paste your OpenAI API key after `OPENAI_API_KEY=`.
-4. Open `sample_playbook.json` and type your real answers into the blanks (install fee, contract,
-   autopay and so on). Anything you leave blank, Hola tells the customer it will check with you.
+4. Open `sample_playbook.json` and type your real answers between the empty quotes `""`
+   (install fee, contract, autopay and so on). Anything you leave blank, Hola tells the customer
+   it will check with you.
 5. Start it:
    ```powershell
    python agent.py console

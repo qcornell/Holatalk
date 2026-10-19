@@ -19,6 +19,7 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 from number_check import amounts_in_text
+from sales_skills import sales_skills_text
 
 
 @dataclass
@@ -154,6 +155,12 @@ class Playbook:
             f"- If they say something like \"{c.get('trigger')}\": {c.get('responseEs') or c.get('responseEn')}"
             for c in self.custom_phrases if c.get("trigger")
         ) or "- none"
+        priced = next((p for p in self.plans if p.price_monthly is not None), None)
+        sales = sales_skills_text(
+            rep=self.rep_name,
+            company=self.company_name,
+            price=f"${_fmt(priced.price_monthly)}" if priced else "el precio",
+        )
 
         return f"""
 # Who you are
@@ -175,6 +182,8 @@ coworker. Use "usted", warm and natural Mexican Spanish, short sentences.
   "ask him..."), say it to the customer in Spanish. If the rep just talks to the customer in
   English, repeat it to the customer in Spanish. Never answer the customer in English.
 - If asked whether you are a person, say you are a virtual assistant helping {self.rep_name}.
+
+{sales}
 
 # Facts you may use (the ONLY numbers, prices, fees and promises you may say)
 Plans:

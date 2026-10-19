@@ -10,18 +10,38 @@
   "promos": [],
   "customPhrases": [],
   "facts": {
-    "Price": { "Taxes and fees": "", "Price locked for": "", "Price after that": "" },
-    "Install": { "Install fee": "", "Soonest install": "", "How long it takes": "", "Who must be home": "", "Drilling or new wires": "" },
-    "Contract": { "Contract (yes or no)": "", "Length": "", "Cancellation fee": "", "If they move": "" },
-    "Autopay and paying": { "Autopay required or optional": "", "Autopay discount": "", "Ways to pay": "", "First bill": "" },
-    "Credit and ID": { "Credit check": "", "Social Security number needed": "", "IDs accepted": "", "Deposit": "" },
-    "Speed and Wi-Fi": { "Speed": "", "Fiber, cable or other": "", "Data limit": "", "Wi-Fi coverage or extenders": "" },
-    "Equipment": { "Router included": "", "Equipment fee": "", "Return rules": "" },
-    "Switching": { "Help cancelling the old provider": "", "Buyout of their old fee": "" },
-    "Trust": { "Company name": "", "Rep badge or ID": "", "Number they can call to check": "", "Local store": "" },
-    "Support in Spanish": { "Spanish support number": "", "Hours": "" },
-    "Bundles": { "Other products and bundle prices": "" },
-    "Renting": { "Landlord policy": "" },
-    "Their info": { "Why each piece is needed": "", "Privacy line": "" }
+    "Your offer": {
+      "Price includes taxes and fees (yes / no, about $ extra / not sure)": "",
+      "Price stays the same for (12 months / 24 months / always / not sure)": "",
+      "Current promo and when it ends": ""
+    },
+    "The rules": {
+      "Contract (none / 12 months / 24 months)": "",
+      "Cancellation fee": "",
+      "Credit check (yes / no)": "",
+      "Social Security number needed (yes / no)": "",
+      "IDs accepted (matrícula, passport, ITIN, state ID, driver's license)": "",
+      "Deposit (none / $)": ""
+    },
+    "Install and paying": {
+      "Install fee (free / $)": "",
+      "Soonest install (same day / next day / within 3 days / within a week)": "",
+      "How long the install takes": "",
+      "Who must be home (an adult 18 or older)": "",
+      "Drilling or new wires": "",
+      "Autopay (required / optional / not offered)": "",
+      "Autopay discount": "",
+      "Ways to pay (card / debit / bank account / cash at a store / money order)": "",
+      "First bill (when and how much)": ""
+    },
+    "Extras": {
+      "Router and equipment included, and any equipment fee": "",
+      "Data limit": "",
+      "Spanish customer service number": "",
+      "Number customers can call to check you are real": "",
+      "Local store": "",
+      "Help switching from their old company, or paying their old cancellation fee": "",
+      "Renters: is the landlord's OK needed": ""
+    }
   }
 }
