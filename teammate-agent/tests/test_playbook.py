@@ -18,7 +18,7 @@ def test_sample_loads():
 def test_greeting_says_it_is_ai_and_fits_time_of_day():
     pb = Playbook.from_file(SAMPLE)
     assert pb.greeting(datetime(2026, 10, 19, 15, 0)) == (
-        "¡Hola, buenas tardes! Soy Sofía, la asistente virtual de Max."
+        "¡Hola, buenas tardes! Soy Ana, la asistente virtual de Max. ¿Cómo está?"
     )
     assert "buenos días" in pb.greeting(datetime(2026, 10, 19, 11, 0))
 
@@ -26,8 +26,15 @@ def test_greeting_says_it_is_ai_and_fits_time_of_day():
 def test_blank_answers_are_listed_as_unknown_not_invented():
     pb = Playbook.from_file(SAMPLE)
     text = pb.instructions(datetime(2026, 10, 19, 15, 0))
-    assert "Install and paying: Install fee (free / $)" in text  # listed under "What you do NOT know"
-    assert "Contract: no" not in text  # no contract policy was given, so none is claimed
+    assert "Install and paying: Autopay (required / optional / not offered)" in text  # under "What you do NOT know"
+    assert "Install fee (free / $)" not in text.split("# What you do NOT know")[1]  # filled in, so known
+
+
+def test_max_pitch_and_facts():
+    pb = Playbook.from_file(SAMPLE)
+    text = pb.instructions(datetime(2026, 10, 19, 15, 0))
+    assert "por solo $35 al mes" in pb.pitch and "¿Ya tiene una tele inteligente?" in pb.pitch
+    assert "Contract: no" in text and "Installation fee: $0" in text
 
 
 def test_allowed_amounts_come_from_playbook():

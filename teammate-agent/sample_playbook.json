@@ -1,12 +1,20 @@
 {
   "repName": "Max",
-  "assistantName": "Sofía",
+  "assistantName": "Ana",
   "companyName": "",
-  "pitch": "Estamos en su vecindario instalando internet por solo $35 al mes. Pregunte cuánto paga ahora. Si le interesa, pida su nombre, teléfono y correo para apartarle la instalación.",
+  "pitch": "Ofrecemos internet aquí en el área por solo $35 al mes. Si le interesa, normalmente solo necesitamos su nombre, un número de teléfono y su correo, y se lo dejamos listo. La instalación es gratis y no hay contrato. ¿Ya tiene una tele inteligente?",
   "plans": [
-    { "name": "Internet", "speed": "", "priceMonthly": 35, "features": [] }
+    {
+      "name": "Internet",
+      "speed": "",
+      "priceMonthly": 35,
+      "features": []
+    }
   ],
-  "policies": {},
+  "policies": {
+    "hasContract": false,
+    "installationFee": 0
+  },
   "promos": [],
   "customPhrases": [],
   "facts": {
@@ -16,7 +24,7 @@
       "Current promo and when it ends": ""
     },
     "The rules": {
-      "Contract (none / 12 months / 24 months)": "",
+      "Contract (none / 12 months / 24 months)": "None (sin contrato)",
       "Cancellation fee": "",
       "Credit check (yes / no)": "",
       "Social Security number needed (yes / no)": "",
@@ -24,7 +32,7 @@
       "Deposit (none / $)": ""
     },
     "Install and paying": {
-      "Install fee (free / $)": "",
+      "Install fee (free / $)": "Free (instalación gratis)",
       "Soonest install (same day / next day / within 3 days / within a week)": "",
       "How long the install takes": "",
       "Who must be home (an adult 18 or older)": "",

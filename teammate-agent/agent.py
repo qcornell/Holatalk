@@ -126,7 +126,7 @@ class TeammateAgent(Agent):
 
     async def on_enter(self) -> None:
         self.session.generate_reply(
-            instructions="Start now: say your first words exactly as written, then begin the pitch."
+            instructions="Start now: say your first words exactly as written. After they answer, run the pitch."
         )
 
     @function_tool

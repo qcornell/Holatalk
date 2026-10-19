@@ -3,7 +3,7 @@
 The shape matches the app's CompanyConfig (src/config/types.ts) so the phone can
 send its saved setup as-is, plus three Teammate-mode additions:
 
-  assistantName  name Hola introduces itself with (default "Sofía")
+  assistantName  name Hola introduces itself with (default "Ana")
   pitch          the rep's opening pitch, in Spanish or English
   facts          answers from the "Customer questions" tab, grouped by topic.
                  A blank answer means "unknown": Hola hands that question to the rep.
@@ -34,7 +34,7 @@ class Plan:
 class Playbook:
     rep_name: str
     company_name: str
-    assistant_name: str = "Sofía"
+    assistant_name: str = "Ana"
     pitch: str = ""
     plans: list[Plan] = field(default_factory=list)
     policies: dict[str, Any] = field(default_factory=dict)
@@ -58,7 +58,7 @@ class Playbook:
         return cls(
             rep_name=str(d.get("repName") or "el representante"),
             company_name=str(d.get("companyName") or ""),
-            assistant_name=str(d.get("assistantName") or "Sofía"),
+            assistant_name=str(d.get("assistantName") or "Ana"),
             pitch=str(d.get("pitch") or ""),
             plans=plans,
             policies=dict(d.get("policies") or {}),
@@ -120,7 +120,7 @@ class Playbook:
         now = now or datetime.now(ZoneInfo(tz))
         h = now.hour
         saludo = "buenos días" if h < 12 else "buenas tardes" if h < 19 else "buenas noches"
-        return f"¡Hola, {saludo}! Soy {self.assistant_name}, la asistente virtual de {self.rep_name}."
+        return f"¡Hola, {saludo}! Soy {self.assistant_name}, la asistente virtual de {self.rep_name}. ¿Cómo está?"
 
     def instructions(self, now: datetime | None = None, tz: str = "America/Chicago") -> str:
         plans = "\n".join(
@@ -169,7 +169,7 @@ with {self.rep_name}{f' from {self.company_name}' if self.company_name else ''}.
 speaker at a customer's front door. You talk WITH the customer in Spanish, like a helpful bilingual
 coworker. Use "usted", warm and natural Mexican Spanish, short sentences.
 
-# Your first words (say exactly this, then continue with the pitch)
+# Your first words (say exactly this, let them answer, then run the pitch)
 "{self.greeting(now)}"
 
 # The pitch to run
