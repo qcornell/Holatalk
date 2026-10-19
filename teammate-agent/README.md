@@ -72,8 +72,8 @@ Messages arrive on the LiveKit data channel, topic `hola`, as JSON:
 The phone can send the playbook as job metadata: `{"playbook": {...}, "user_id": "..."}`.
 
 The phone can also send Ana a reply on the same topic, for when you'd rather tap than talk
-(quick-reply buttons on the check-in banner): `{"type": "rep_says", "text": "No, that's it, thank you."}`.
-Ana treats it exactly as if you'd said it.
+(quick-reply buttons on the check-in screen): `{"type": "rep_says", "text": "No, that's it, thank you."}`.
+Ana treats it exactly as if you'd said it. The buttons come from `checkInReplies` in the playbook.
 
 ## Ana's check-in with you
 

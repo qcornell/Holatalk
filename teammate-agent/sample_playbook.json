@@ -29,6 +29,11 @@
   },
   "promos": [],
   "customPhrases": [],
+  "checkInReplies": [
+    "Ask if they have an SSN or passport",
+    "Explain: $35 with autopay from checking, $45 with debit",
+    "No, that's it, thank you"
+  ],
   "facts": {
     "Your offer": {
       "Price includes taxes and fees (yes / no, about $ extra / not sure)": "",

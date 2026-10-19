@@ -10,6 +10,8 @@ send its saved setup as-is, plus three Teammate-mode additions:
 
 Each plan can also list priceOptions when the way they pay changes the price, for example
 $35 with autopay from a checking account and $45 with a debit card.
+
+checkInReplies (the rep's quick-reply buttons for Ana's check-in) is read by the phone app only.
 """
 
 from __future__ import annotations
