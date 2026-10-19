@@ -146,7 +146,8 @@ BRUSH_OFFS: list[tuple[str, str, str]] = [
      "Es normal preguntar. Trabajo con {rep}{company_part}. {rep} le puede mostrar su identificación."),
     ("¿Para qué quiere mis datos?",
      "Privacy worry.",
-     "Solo para apartarle la instalación y mandarle la confirmación. Yo no le voy a pedir su seguro social ni su tarjeta."),
+     "Solo para apartarle la instalación y mandarle la confirmación. Números como el seguro social o la cuenta "
+     "del banco no me los dice a mí: si hacen falta, se los da directamente a {rep}."),
     ("No tengo tiempo para la instalación.",
      "Scheduling.",
      "¿Qué días descansa? Buscamos la cita que mejor le quede."),

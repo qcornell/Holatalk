@@ -1,8 +1,8 @@
 """Find money amounts in Spanish (or English) speech and check them against the playbook.
 
 Hola speaks before anything can check it, so this runs on what it just said. Any amount
-that isn't in the playbook, wasn't said by the customer, and isn't simple math on those
-(a savings difference, a yearly total) gets flagged to the rep and corrected out loud.
+that isn't in the playbook, wasn't said by the customer or the rep, and isn't simple math on
+those (a savings difference, a yearly total) gets flagged to the rep and corrected out loud.
 """
 
 from __future__ import annotations
@@ -23,8 +23,15 @@ _UNITS = {
     "quinientas": 500, "seiscientos": 600, "seiscientas": 600, "setecientos": 700,
     "setecientas": 700, "ochocientos": 800, "ochocientas": 800, "novecientos": 900,
     "novecientas": 900,
+    # English, for what the rep says ("tell her it's forty-five with debit")
+    "zero": 0, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7,
+    "eight": 8, "nine": 9, "ten": 10, "eleven": 11, "twelve": 12, "thirteen": 13, "fourteen": 14,
+    "fifteen": 15, "sixteen": 16, "seventeen": 17, "eighteen": 18, "nineteen": 19, "twenty": 20,
+    "thirty": 30, "forty": 40, "fifty": 50, "sixty": 60, "seventy": 70, "eighty": 80, "ninety": 90,
 }
-_THOUSAND = {"mil"}
+_HUNDRED = {"hundred"}  # English multiplies ("two hundred"); Spanish "doscientos" is one word
+_THOUSAND = {"mil", "thousand"}
+_AND = {"y", "and"}
 _MONEY_AFTER = {"dolar", "dolares", "dollar", "dollars", "bucks", "mensual", "mensuales"}
 _PER = {"al", "por", "cada", "a", "per", "each", "every"}
 _MONTH = {"mes", "month", "mensualidad"}
@@ -48,8 +55,8 @@ def _digits(tok: str) -> float | None:
 
 
 def _parse_words(toks: list[str], i: int) -> tuple[float, int] | None:
-    """Parse a run of Spanish number words starting at toks[i]. Returns (value, next_index)."""
-    if toks[i] not in _UNITS and toks[i] not in _THOUSAND:
+    """Parse a run of Spanish or English number words starting at toks[i]. Returns (value, next_index)."""
+    if toks[i] not in _UNITS and toks[i] not in _THOUSAND and toks[i] not in _HUNDRED:
         return None
     total, current, j, seen = 0, 0, i, False
     while j < len(toks):
@@ -58,13 +65,17 @@ def _parse_words(toks: list[str], i: int) -> tuple[float, int] | None:
             current += _UNITS[t]
             seen = True
             j += 1
+        elif t in _HUNDRED:
+            current = (current or 1) * 100
+            seen = True
+            j += 1
         elif t in _THOUSAND:
             current = (current or 1) * 1000
             total += current
             current = 0
             seen = True
             j += 1
-        elif t == "y" and seen and j + 1 < len(toks) and toks[j + 1] in _UNITS:
+        elif t in _AND and seen and j + 1 < len(toks) and toks[j + 1] in _UNITS:
             j += 1
         else:
             break
@@ -114,7 +125,7 @@ def _is_money(toks: list[str], start: int, end: int) -> bool:
 
 
 def expand_allowed(base: set[float], customer_said: set[float]) -> set[float]:
-    """What Hola may say: playbook amounts, the customer's own amounts, savings and yearly totals."""
+    """What Hola may say: playbook amounts, amounts the customer or rep said, savings and yearly totals."""
     allowed = set(base) | set(customer_said)
     allowed |= {round(abs(c - b), 2) for c in customer_said for b in base}
     allowed |= {round(b * 12, 2) for b in base}

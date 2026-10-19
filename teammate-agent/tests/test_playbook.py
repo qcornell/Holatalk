@@ -26,8 +26,10 @@ def test_greeting_says_it_is_ai_and_fits_time_of_day():
 def test_blank_answers_are_listed_as_unknown_not_invented():
     pb = Playbook.from_file(SAMPLE)
     text = pb.instructions(datetime(2026, 10, 19, 15, 0))
-    assert "Install and paying: Autopay (required / optional / not offered)" in text  # under "What you do NOT know"
-    assert "Install fee (free / $)" not in text.split("# What you do NOT know")[1]  # filled in, so known
+    unknown = text.split("# What you do NOT know")[1].split("# Hard rules")[0]
+    assert "The rules: Deposit (none / $)" in unknown
+    assert "Install fee (free / $)" not in unknown  # filled in, so known
+    assert "Autopay (required / optional / not offered)" not in unknown
 
 
 def test_max_pitch_and_facts():

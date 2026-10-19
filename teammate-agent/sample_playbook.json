@@ -8,7 +8,19 @@
       "name": "Internet",
       "speed": "",
       "priceMonthly": 35,
-      "features": []
+      "features": [],
+      "priceOptions": [
+        {
+          "how": "Autopay from a checking account (account and routing number)",
+          "howEs": "pago automático de su cuenta de cheques, con número de cuenta y de ruta",
+          "priceMonthly": 35
+        },
+        {
+          "how": "Debit card",
+          "howEs": "con tarjeta de débito",
+          "priceMonthly": 45
+        }
+      ]
     }
   ],
   "policies": {
@@ -37,9 +49,9 @@
       "How long the install takes": "",
       "Who must be home (an adult 18 or older)": "",
       "Drilling or new wires": "",
-      "Autopay (required / optional / not offered)": "",
-      "Autopay discount": "",
-      "Ways to pay (card / debit / bank account / cash at a store / money order)": "",
+      "Autopay (required / optional / not offered)": "Optional, but autopay from a checking account is what gets the $35 price",
+      "Autopay discount": "$35 a month with checking-account autopay instead of $45 with a debit card ($10 less)",
+      "Ways to pay (card / debit / bank account / cash at a store / money order)": "Autopay from a checking account (account and routing number) for $35 a month, or a debit card for $45 a month",
       "First bill (when and how much)": ""
     },
     "Extras": {

@@ -7,11 +7,16 @@ send its saved setup as-is, plus three Teammate-mode additions:
   pitch          the rep's opening pitch, in Spanish or English
   facts          answers from the "Customer questions" tab, grouped by topic.
                  A blank answer means "unknown": Hola hands that question to the rep.
+
+Each plan can also list priceOptions when the way they pay changes the price, for example
+$35 with autopay from a checking account and $45 with a debit card.
 """
 
 from __future__ import annotations
 
 import json
+import re
+import unicodedata
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -23,11 +28,26 @@ from sales_skills import sales_skills_text
 
 
 @dataclass
+class PriceOption:
+    """One way to pay and its monthly price, e.g. autopay from checking = $35, debit card = $45."""
+    how: str
+    how_es: str = ""
+    price_monthly: float | None = None
+
+
+@dataclass
 class Plan:
     name: str
     speed: str = ""
     price_monthly: float | None = None
     features: list[str] = field(default_factory=list)
+    price_options: list[PriceOption] = field(default_factory=list)
+
+    def lowest_price(self) -> float | None:
+        prices = [o.price_monthly for o in self.price_options if o.price_monthly is not None]
+        if self.price_monthly is not None:
+            prices.append(self.price_monthly)
+        return min(prices) if prices else None
 
 
 @dataclass
@@ -52,6 +72,15 @@ class Playbook:
                 speed=str(p.get("speed", "")),
                 price_monthly=_num(p.get("priceMonthly")),
                 features=[str(f) for f in p.get("features", []) or []],
+                price_options=[
+                    PriceOption(
+                        how=str(o.get("how") or ""),
+                        how_es=str(o.get("howEs") or ""),
+                        price_monthly=_num(o.get("priceMonthly")),
+                    )
+                    for o in p.get("priceOptions", []) or []
+                    if o.get("how") or o.get("howEs")
+                ],
             )
             for p in d.get("plans", []) or []
         ]
@@ -90,6 +119,18 @@ class Playbook:
                 return p
         return self.plans[0] if len(self.plans) == 1 else None
 
+    def find_price_option(self, plan: Plan | None, how: str) -> PriceOption | None:
+        """Match what Ana said about paying ("autopay checking", "débito") to one of the plan's options."""
+        if not plan or not plan.price_options or not how.strip():
+            return None
+        said = _words(how)
+        best, best_score = None, 0
+        for o in plan.price_options:
+            score = len(said & _words(o.how + " " + o.how_es))
+            if score > best_score:
+                best, best_score = o, score
+        return best
+
     def known_facts(self) -> dict[str, dict[str, str]]:
         return {t: {k: v for k, v in a.items() if v} for t, a in self.facts.items() if any(a.values())}
 
@@ -100,8 +141,11 @@ class Playbook:
         """Every money amount Hola may say on its own (customer-said amounts are added live)."""
         out: set[float] = set()
         for p in self.plans:
+            prices = [o.price_monthly for o in p.price_options if o.price_monthly is not None]
             if p.price_monthly is not None:
-                out.add(p.price_monthly)
+                prices.append(p.price_monthly)
+            out |= set(prices)
+            out |= {round(abs(a - b), 2) for a in prices for b in prices if a != b}  # "$10 less with autopay"
         for key in ("installationFee", "earlyTerminationFee"):
             v = _num(self.policies.get(key))
             if v is not None:
@@ -124,11 +168,23 @@ class Playbook:
 
     def instructions(self, now: datetime | None = None, tz: str = "America/Chicago") -> str:
         plans = "\n".join(
-            f"- {p.name}: ${_fmt(p.price_monthly)} al mes"
+            f"- {p.name}: ${_fmt(p.lowest_price())} al mes"
             + (f", {p.speed}" if p.speed else "")
             + (f" ({', '.join(p.features)})" if p.features else "")
+            + "".join(
+                f"\n  - ${_fmt(o.price_monthly)} al mes: {o.how}" + (f" ({o.how_es})" if o.how_es else "")
+                for o in p.price_options
+            )
             for p in self.plans
         ) or "- (no plans loaded)"
+        has_options = any(len(p.price_options) > 1 for p in self.plans)
+        paying_rule = (
+            "\n- How they pay changes the price (see Plans). The pitch price is the lowest one. Explain both "
+            "ways to pay, with their prices, when they ask how to pay or about autopay, when the rep asks you to, "
+            "and once before you say goodbye if nobody has yet, so the first bill is no surprise."
+            if has_options else ""
+        )
+        rep = self.rep_name
         pol = self.policies
         policy_lines = [
             (f"- Contract: {'yes' if pol.get('hasContract') else 'no'}"
@@ -155,11 +211,11 @@ class Playbook:
             f"- If they say something like \"{c.get('trigger')}\": {c.get('responseEs') or c.get('responseEn')}"
             for c in self.custom_phrases if c.get("trigger")
         ) or "- none"
-        priced = next((p for p in self.plans if p.price_monthly is not None), None)
+        priced = next((p for p in self.plans if p.lowest_price() is not None), None)
         sales = sales_skills_text(
             rep=self.rep_name,
             company=self.company_name,
-            price=f"${_fmt(priced.price_monthly)}" if priced else "el precio",
+            price=f"${_fmt(priced.lowest_price())}" if priced else "el precio",
         )
 
         return f"""
@@ -180,8 +236,30 @@ coworker. Use "usted", warm and natural Mexican Spanish, short sentences.
 - Let the customer interrupt. If they ask something, answer it first, then go back to the pitch.
 - Anything in ENGLISH is the rep talking. If the rep tells you to say something ("tell her...",
   "ask him..."), say it to the customer in Spanish. If the rep just talks to the customer in
-  English, repeat it to the customer in Spanish. Never answer the customer in English.
-- If asked whether you are a person, say you are a virtual assistant helping {self.rep_name}.
+  English, repeat it to the customer in Spanish. If he's talking to YOU (answering your check-in,
+  or saying your name), see "Checking in" below. Never answer the customer in English.
+- If asked whether you are a person, say you are a virtual assistant helping {rep}.
+
+# Checking in with {rep} (like a real interpreter stepping aside)
+You and {rep} are a team. At times you step aside, talk to him in English, then come back.
+- How: first tell the customer in Spanish "Un momentito, déjeme hablar con {rep}." Then talk to {rep}
+  in short, plain ENGLISH and wait for his answer.
+- When:
+  1. Right after save_lead. Ask: "{rep}, I've got their name, number and email. Anything else you
+     want me to ask or explain?"
+  2. When your facts don't answer a question: call ask_rep, then ask him the question in English.
+  3. Any time {rep} talks to you in English ("{self.assistant_name}, ..."): answer him in English in a few words.
+- His answer is for you, not a line to read out. Do it in Spanish, in your own short words:
+  - "Ask them..." / "ask if they have..." -> ask the customer. Then tell {rep} their answer in one
+    short English line ("She has a passport.") and wait for what's next.
+  - "Explain..." / "tell them..." -> explain it, keeping his numbers and details exactly. Then
+    ask the customer if it's clear, and tell {rep} in English if they have a question.
+  - "No, that's it" / "that's all, thanks" -> turn back to the customer in Spanish ("Listo, gracias
+    por esperar."), thank them, and say {rep} will finish the sign-up with them.
+- Never say "{rep} me dice que le pregunte...". Just ask, like it's your own question.
+- While you wait for him, if the customer talks, say "Un momentito, por favor" and keep waiting.
+- A line that starts with "[rep tapped]" is {rep} too: he tapped it on his phone instead of saying it.
+- What {rep} tells you counts as a fact for this call. Never add to it.
 
 {sales}
 
@@ -200,14 +278,18 @@ Rep's custom lines:
 # What you do NOT know (never guess these)
 {unknown}
 If a question is not answered by the facts above, call the ask_rep tool and tell the customer:
-"Buena pregunta. Déjeme confirmarlo con {self.rep_name} para darle la respuesta correcta."
+"Buena pregunta. Déjeme confirmarlo con {rep} para darle la respuesta correcta."
 
 # Hard rules
 - Never invent a price, fee, discount, refund, waived fee, date or promise.
-- When you quote a plan price, call show_price so the customer sees it on the screen too.
-- To sign them up, collect: full name, phone number, email, service address, and the plan.
-  Read the phone number back digit by digit and spell the email back. Then call save_lead.
-- Never ask for Social Security numbers, card numbers or bank details. The rep handles that.
+- When you quote a plan price, call show_price so the customer sees it on the screen too.{paying_rule}
+- To sign them up, collect: full name, phone number and email. Read the phone number back digit by
+  digit and spell the email back, then call save_lead. Don't ask for the address: {rep} is standing at it.
+- You may ASK whether they have a Social Security number, ITIN, passport or other ID, and which one,
+  when {rep} asks you to or your facts say it's needed. Never ask them to say the number itself, or a
+  card, bank account or routing number. Those go straight to {rep}: "Ese número se lo da directamente
+  a {rep} para que lo ponga en el sistema." If they start reading one out, don't repeat it back, and
+  never put it in save_lead.
 - If the customer clearly says no twice, thank them kindly and stop pitching.
 """.strip()
 
@@ -220,6 +302,16 @@ def _num(v: Any) -> float | None:
     except (TypeError, ValueError):
         found = amounts_in_text(str(v), money_only=False)
         return found[0] if found else None
+
+
+_STOP = {"de", "del", "la", "el", "los", "las", "con", "por", "su", "a", "an", "the", "from", "with", "of", "and", "y", "or", "o"}
+
+
+def _words(text: str) -> set[str]:
+    """Lowercase, accent-free words cut to 5 letters, for loose matching ("débito" ~ "debit")."""
+    t = unicodedata.normalize("NFKD", text.lower())
+    t = "".join(c for c in t if not unicodedata.combining(c))
+    return {w[:5] for w in re.findall(r"[a-z]+", t) if w not in _STOP and len(w) > 2}
 
 
 def _fmt(v: float | None) -> str:

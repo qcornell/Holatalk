@@ -4,6 +4,8 @@ The rep's phone joins a LiveKit room on speakerphone. This agent joins the same 
 talks with the customer in Spanish on OpenAI's gpt-realtime-2.1 (or GPT-Live-1 with
 ENGINE=live in .env), and sends the phone:
 English captions, price cards, the sign-up form, and any flagged numbers.
+Like a real interpreter, Ana steps aside to check in with the rep in English after the
+sign-up is saved, or when she doesn't know an answer.
 
 Run it:
   python agent.py console   talk to it with your PC mic and speakers (quickest test)
@@ -56,9 +58,11 @@ VOICE = os.getenv("VOICE", "marin")
 CAPTION_MODEL = os.getenv("CAPTION_MODEL", "gpt-4o-mini")
 TRANSCRIBE_MODEL = os.getenv("TRANSCRIBE_MODEL", "gpt-4o-transcribe")
 SILENCE_SECONDS = float(os.getenv("SILENCE_SECONDS", "30"))
+REP_WAIT_SECONDS = float(os.getenv("REP_WAIT_SECONDS", "15"))  # then Ana says "Max?" once, then carries on
 MAX_MINUTES = float(os.getenv("MAX_MINUTES", "20"))
 TIMEZONE = os.getenv("TIMEZONE", "America/Chicago")
 PHONE_TOPIC = "hola"
+TAP_PREFIX = "[rep tapped]"
 
 
 # ---------------------------------------------------------------- phone messages
@@ -71,7 +75,7 @@ class PhoneBridge:
 
     async def send(self, kind: str, **data: Any) -> None:
         payload = json.dumps({"type": kind, **data}, ensure_ascii=False)
-        logger.info("to phone: %s", payload)
+        logger.info("to phone: %s", mask_digits(payload))  # no full SSNs or account numbers in server logs
         try:
             await self.ctx.room.local_participant.publish_data(payload, reliable=True, topic=PHONE_TOPIC)
         except Exception as e:  # console mode has no real room
@@ -104,8 +108,13 @@ class Captioner:
             return text
 
 
-_EN = {"the", "and", "you", "is", "are", "tell", "her", "him", "ask", "we", "it", "to", "can", "what", "how", "she", "he"}
-_ES = {"el", "la", "los", "las", "que", "es", "y", "de", "por", "para", "usted", "no", "sí", "si", "mi", "su", "cuánto", "cuanto"}
+_EN = {"the", "and", "you", "is", "are", "tell", "her", "him", "ask", "we", "it", "to", "can", "what", "how",
+       "she", "he", "with", "from", "that", "that's", "this", "have", "has", "if", "they", "them", "their",
+       "yes", "yeah", "okay", "ok", "thanks", "thank", "explain", "of", "for", "my", "your", "do", "does",
+       "don't", "need", "about", "all", "just", "so", "will", "please", "or", "in", "on", "at", "it's", "anything"}
+_ES = {"el", "la", "los", "las", "que", "es", "y", "de", "por", "para", "usted", "sí", "si", "mi", "su",
+       "cuánto", "cuanto", "en", "un", "una", "con", "del", "lo", "le", "se", "nos", "pero", "bien", "gracias",
+       "está", "tiene", "tengo", "quiero", "aquí", "ahorita", "más", "muy", "ya", "también", "cómo", "qué", "porque"}
 
 
 def looks_english(text: str) -> bool:
@@ -115,6 +124,14 @@ def looks_english(text: str) -> bool:
     return en > es
 
 
+_LONG_DIGITS = re.compile(r"\d(?:[\s.-]?\d){6,}")
+
+
+def mask_digits(text: str) -> str:
+    """Hide all but the last 4 of any long number (SSN, card, bank account, phone)."""
+    return _LONG_DIGITS.sub(lambda m: "•••" + re.sub(r"\D", "", m.group())[-4:], text)
+
+
 # ---------------------------------------------------------------- the agent
 
 class TeammateAgent(Agent):
@@ -122,12 +139,48 @@ class TeammateAgent(Agent):
         super().__init__(instructions=playbook.instructions(tz=TIMEZONE))
         self.playbook = playbook
         self.phone = phone
-        self.lead: dict[str, str] = {}
+        self.lead: dict[str, Any] = {}
+        self.rep_heard_at = 0.0  # last time the rep spoke English or tapped a reply
+        self._waiting: asyncio.Task | None = None
 
     async def on_enter(self) -> None:
         self.session.generate_reply(
             instructions="Start now: say your first words exactly as written. After they answer, run the pitch."
         )
+
+    # ---- waiting on the rep after a check-in
+
+    def heard_rep(self) -> None:
+        self.rep_heard_at = time.monotonic()
+
+    def wait_for_rep(self) -> None:
+        """After Ana asks the rep something: if he says nothing, she says his name once, then carries on."""
+        if self._waiting and not self._waiting.done():
+            self._waiting.cancel()
+        self._waiting = asyncio.create_task(self._nudge_rep(time.monotonic()))
+
+    async def _nudge_rep(self, asked_at: float) -> None:
+        rep = self.playbook.rep_name
+        steps = [
+            f"{rep} hasn't answered you. Say his name once, in English: '{rep}?'",
+            f"{rep} is busy. Turn back to the customer in Spanish, thank them for waiting, and carry on. "
+            f"If they were waiting on an answer, say {rep} will answer it in a moment.",
+        ]
+        for i, step in enumerate(steps):
+            await asyncio.sleep(REP_WAIT_SECONDS)
+            if self.rep_heard_at > asked_at:
+                return
+            if i == 0:
+                await self.phone.send("rep_nudge")  # the phone buzzes
+            try:
+                self.session.generate_reply(instructions=step)
+            except RuntimeError as e:  # the call already ended
+                logger.debug("nudge skipped: %s", e)
+                return
+
+    async def on_exit(self) -> None:
+        if self._waiting and not self._waiting.done():
+            self._waiting.cancel()
 
     @function_tool
     async def show_price(self, context: RunContext, plan_name: str) -> str:
@@ -137,26 +190,32 @@ class TeammateAgent(Agent):
             plan_name: The plan name exactly as listed in your facts.
         """
         plan = self.playbook.find_plan(plan_name)
-        if not plan or plan.price_monthly is None:
+        price = plan.lowest_price() if plan else None
+        if not plan or price is None:
             await self.phone.send("ask_rep", question=f"Price for plan '{plan_name}'?")
             return f"That plan is not in the facts. Tell the customer you'll confirm with {self.playbook.rep_name}."
+        options = [{"how": o.how, "howEs": o.how_es, "monthly": o.price_monthly} for o in plan.price_options]
         await self.phone.send(
-            "price_card", plan=plan.name, monthly=plan.price_monthly, speed=plan.speed, features=plan.features
+            "price_card", plan=plan.name, monthly=price, speed=plan.speed, features=plan.features, options=options
         )
-        return f"{plan.name}: ${plan.price_monthly:g} al mes. Shown on screen."
+        if len(options) > 1:
+            ways = "; ".join(f"${o['monthly']:g} {o['howEs'] or o['how']}" for o in options)
+            return f"{plan.name}: {ways}. Shown on screen."
+        return f"{plan.name}: ${price:g} al mes. Shown on screen."
 
     @function_tool
     async def save_lead(
-        self, context: RunContext, full_name: str, phone: str, email: str, address: str, plan: str
+        self, context: RunContext, full_name: str, phone: str, email: str, payment: str = "", plan: str = ""
     ) -> str:
         """Save the customer's sign-up details after reading the phone and email back to them.
+        Never pass a Social Security, ID, card or bank number here.
 
         Args:
             full_name: Customer's full name.
             phone: Customer's phone number, digits only if possible.
             email: Customer's email address.
-            address: Service address.
-            plan: The plan they chose.
+            payment: How they'll pay if they said, for example "autopay checking" or "debit card". Blank if not yet.
+            plan: The plan they chose. Blank if there is only one.
         """
         digits = re.sub(r"\D", "", phone)
         if len(digits) == 11 and digits.startswith("1"):
@@ -168,22 +227,39 @@ class TeammateAgent(Agent):
             problems.append("the email doesn't look complete")
         if problems:
             return "Not saved yet: " + " and ".join(problems) + ". Ask the customer to repeat it."
-        self.lead = {"name": full_name.strip(), "phone": digits, "email": email.strip(),
-                     "address": address.strip(), "plan": plan.strip()}
+        chosen = self.playbook.find_plan(plan or "")
+        option = self.playbook.find_price_option(chosen, payment)
+        first_save = not self.lead
+        self.lead = {
+            "name": full_name.strip(), "phone": digits, "email": email.strip(),
+            "plan": chosen.name if chosen else plan.strip(),
+            "payment": option.how if option else "",
+            "monthly": option.price_monthly if option else (chosen.lowest_price() if chosen else None),
+        }
         await self.phone.send("lead", fields=self.lead)
-        return (f"Saved. Thank the customer and tell them {self.playbook.rep_name} will finish "
-                "the sign-up with them right now.")
+        if not first_save:
+            return "Updated on the rep's screen. Carry on where you were."
+        await self.phone.send("check_in", reason="sign-up saved")
+        self.wait_for_rep()
+        rep = self.playbook.rep_name
+        return (f"Saved. Now check in with {rep}: tell the customer in Spanish 'Perfecto, ya quedó. Un momentito, "
+                f"déjeme hablar con {rep}.' Then ask {rep} in English: '{rep}, I've got their name, number and "
+                "email. Anything else you want me to ask or explain?' Then wait for his answer. If they tell you "
+                "how they'll pay later, call save_lead again with it.")
 
     @function_tool
     async def ask_rep(self, context: RunContext, question: str) -> str:
-        """Hand a question to the rep when your facts don't answer it. Never guess instead.
+        """Ask the rep, out loud in English, when your facts don't answer a question. Never guess instead.
 
         Args:
-            question: The customer's question, in the customer's words.
+            question: The customer's question, in short plain English.
         """
         await self.phone.send("ask_rep", question=question)
-        return (f"Sent to the rep. Tell the customer: 'Buena pregunta. Déjeme confirmarlo con "
-                f"{self.playbook.rep_name} para darle la respuesta correcta.'")
+        self.wait_for_rep()
+        rep = self.playbook.rep_name
+        return (f"Tell the customer in Spanish: 'Buena pregunta. Déjeme confirmarlo con {rep}.' Then ask {rep} "
+                f"in English, in one short line: '{rep}, {question}' Then wait. When he answers, tell the "
+                "customer in Spanish, using exactly what he said.")
 
     @function_tool
     async def schedule_callback(
@@ -277,7 +353,7 @@ async def entrypoint(ctx: JobContext) -> None:
     tasks: set[asyncio.Task] = set()
 
     base_amounts = playbook.allowed_amounts()
-    customer_amounts: set[float] = set()
+    heard_amounts: set[float] = set()  # amounts the customer or the rep said out loud
     corrections = {"count": 0}
 
     def spawn(coro) -> None:
@@ -288,12 +364,13 @@ async def entrypoint(ctx: JobContext) -> None:
     if not ctx.is_fake_job():  # console mode runs without a LiveKit room
         await ctx.connect()
     session = AgentSession(llm=build_model(playbook), user_away_timeout=SILENCE_SECONDS)
+    agent = TeammateAgent(playbook, phone)
 
     async def caption(who: str, text: str) -> None:
         await phone.send("caption", who=who, text=text, en=await captions.to_english(text))
 
     async def check_numbers(text: str) -> None:
-        allowed = expand_allowed(base_amounts, customer_amounts)
+        allowed = expand_allowed(base_amounts, heard_amounts)
         bad = unexpected_amounts(text, allowed)
         if not bad:
             return
@@ -317,11 +394,30 @@ async def entrypoint(ctx: JobContext) -> None:
         if not text:
             return
         if item.role == "user":
-            customer_amounts.update(amounts_in_text(text, money_only=False))
-            spawn(caption("rep" if looks_english(text) else "customer", text))
+            heard_amounts.update(amounts_in_text(text, money_only=False))
+            is_rep = text.startswith(TAP_PREFIX) or looks_english(text)
+            if is_rep:
+                agent.heard_rep()
+            spawn(caption("rep" if is_rep else "customer", text.removeprefix(TAP_PREFIX).strip()))
         elif item.role == "assistant":
             spawn(caption("hola", text))
             spawn(check_numbers(text))
+
+    def _on_data(packet) -> None:
+        """The rep tapped a quick reply on the phone (or typed one) instead of saying it."""
+        if packet.topic != PHONE_TOPIC:
+            return
+        try:
+            msg = json.loads(packet.data.decode("utf-8"))
+        except (ValueError, UnicodeDecodeError):
+            return
+        text = str(msg.get("text") or "").strip()
+        if msg.get("type") == "rep_says" and text:
+            agent.heard_rep()
+            session.generate_reply(user_input=f"{TAP_PREFIX} {text}")
+
+    if not ctx.is_fake_job():
+        ctx.room.on("data_received", _on_data)
 
     ending = {"done": False}
 
@@ -353,10 +449,9 @@ async def entrypoint(ctx: JobContext) -> None:
             room=getattr(ctx.room, "name", "") or "console",
             seconds=seconds,
             model=MODEL_NAME,
-            lead_saved=bool(getattr(agent, "lead", None)),
+            lead_saved=bool(agent.lead),
         )
 
-    agent = TeammateAgent(playbook, phone)
     ctx.add_shutdown_callback(on_shutdown)
     await session.start(agent=agent, room=ctx.room)
     spawn(time_limit())
