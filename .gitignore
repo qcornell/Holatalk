@@ -32,5 +32,6 @@ android/app/*-release.keystore
 # Teammate agent
 teammate-agent/.env
 teammate-agent/.venv/
+teammate-agent/leads.jsonl
 __pycache__/
 .pytest_cache/

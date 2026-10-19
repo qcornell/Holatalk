@@ -1,8 +1,12 @@
 """Find money amounts in Spanish (or English) speech and check them against the playbook.
 
-Hola speaks before anything can check it, so this runs on what it just said. Any amount
-that isn't in the playbook, wasn't said by the customer or the rep, and isn't simple math on
-those (a savings difference, a yearly total) gets flagged to the rep and corrected out loud.
+Hola speaks before anything can check it, so this runs on what it just said:
+
+- an amount with no source at all (not in the playbook, not said by the rep or the customer, not
+  simple math on those) is flagged and corrected out loud;
+- a price tied to the wrong way to pay is flagged and corrected;
+- an amount only the customer said (they may have suggested a wrong price) is passed to the
+  offer judge in offer_judge.py, which reads the whole line against the facts.
 """
 
 from __future__ import annotations
@@ -89,10 +93,14 @@ def _parse_words(toks: list[str], i: int) -> tuple[float, int] | None:
     return value, j
 
 
-def amounts_in_text(text: str, money_only: bool = True) -> list[float]:
-    """Amounts in the text. With money_only, only ones said as money ($35, 35 dólares, 35 al mes)."""
-    toks = _TOKEN.findall(_norm(text))
-    out: list[float] = []
+def tokens(text: str) -> list[str]:
+    return _TOKEN.findall(_norm(text))
+
+
+def amount_spans(text: str, money_only: bool = True) -> list[tuple[float, int, int]]:
+    """(amount, first token, end token) for each amount in the text."""
+    toks = tokens(text)
+    out: list[tuple[float, int, int]] = []
     i = 0
     while i < len(toks):
         tok = toks[i]
@@ -109,8 +117,38 @@ def amounts_in_text(text: str, money_only: bool = True) -> list[float]:
         if val is None:
             continue
         if not money_only or _is_money(toks, start, end):
-            out.append(round(val, 2))
+            out.append((round(val, 2), start, end))
     return out
+
+
+def amounts_in_text(text: str, money_only: bool = True) -> list[float]:
+    """Amounts in the text. With money_only, only ones said as money ($35, 35 dólares, 35 al mes)."""
+    return [a for a, _, _ in amount_spans(text, money_only)]
+
+
+PAIR_WINDOW = 6  # tokens between an amount and a way to pay for the two to count as said together
+
+
+def payment_pairing_errors(text: str, options: list[tuple[float, set[str]]]) -> list[float]:
+    """Prices tied to the wrong way to pay, like "$35 con tarjeta de débito" when debit is $45.
+
+    options: (monthly price, key word stems) per way to pay. An amount is flagged only when a way
+    to pay is mentioned near it and none of the nearby ones has that price, so "$35 con pago
+    automático o $45 con débito" passes.
+    """
+    if len(options) < 2:
+        return []
+    toks = tokens(text)
+    mentions = [(i, price) for i, t in enumerate(toks) for price, keys in options if t[:5] in keys]
+    option_prices = {price for price, _ in options}
+    bad: list[float] = []
+    for amount, start, end in amount_spans(text, money_only=True):
+        if not any(abs(amount - p) < 0.011 for p in option_prices):
+            continue
+        near = [price for i, price in mentions if start - PAIR_WINDOW <= i < end + PAIR_WINDOW]
+        if near and not any(abs(amount - p) < 0.011 for p in near):
+            bad.append(amount)
+    return bad
 
 
 def _is_money(toks: list[str], start: int, end: int) -> bool:
@@ -125,7 +163,7 @@ def _is_money(toks: list[str], start: int, end: int) -> bool:
 
 
 def expand_allowed(base: set[float], customer_said: set[float]) -> set[float]:
-    """What Hola may say: playbook amounts, amounts the customer or rep said, savings and yearly totals."""
+    """Playbook (and rep) amounts plus yearly totals; with customer amounts, also those and the savings."""
     allowed = set(base) | set(customer_said)
     allowed |= {round(abs(c - b), 2) for c in customer_said for b in base}
     allowed |= {round(b * 12, 2) for b in base}

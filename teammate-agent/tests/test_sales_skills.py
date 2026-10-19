@@ -14,7 +14,7 @@ PB = Playbook.from_file(Path(__file__).resolve().parents[1] / "sample_playbook.j
 def test_instructions_include_brush_off_handling():
     text = PB.instructions(datetime(2026, 10, 19, 15, 0))
     assert "¿ya tiene internet en casa?" in text
-    assert "Los datos del celular se acaban rápido" in text  # the hotspot answer
+    assert "los datos del celular se acaban rápido" in text  # the hotspot answer
     assert "at most two friendly tries" in text
     assert "never pitch to anyone under 18" in text
 

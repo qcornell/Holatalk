@@ -32,9 +32,9 @@ DOOR_TYPES: list[dict[str, object]] = [
             'Agree with saving money: "Tiene razón en cuidar su dinero."',
             'Ask: "¿Sus datos son ilimitados, o se le acaban o se le pone lento a fin de mes?" and '
             '"¿Cuántas personas en su casa usan el internet del celular?"',
-            "Paint the difference: hotspot data runs out and slows down, it is slower for videos and the TV, "
-            "they connect every day, and it drains the phone battery. Home internet connects the whole family "
-            "at once without using anyone's data.",
+            "Paint the difference without overclaiming: hotspot data often runs out or slows down, it's usually "
+            "slower for videos and the TV, they have to connect it each time, and it drains the phone battery. "
+            "Home internet connects the whole family at once without using anyone's data.",
             'Frame the price: "Por {price} al mes, toda la familia tiene internet en casa y usted guarda sus datos '
             'para cuando sale."',
             "Close: ask for their name and phone number to reserve the install.",
@@ -114,7 +114,7 @@ BRUSH_OFFS: list[tuple[str, str, str]] = [
      "Me alegra. ¿Le han subido el precio desde que empezó?"),
     ("Solo uso el celular. / Uso hotspot.",
      "No home internet: a strong lead.",
-     "Le entiendo. Los datos del celular se acaban rápido cuando ve videos, es más lento y hay que conectarse cada día. "
+     "Le entiendo. Muchas veces los datos del celular se acaban rápido con los videos, se pone más lento y hay que conectarlo cada vez. "
      "Con internet en casa, toda la familia se conecta sin gastar sus datos, y los guarda para el trabajo o cuando sale. "
      "Y ahorita está muy económico: {price} al mes."),
     ("Uso el WiFi del vecino. / De un familiar.",
