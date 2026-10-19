@@ -1,0 +1,27 @@
+{
+  "repName": "Max",
+  "assistantName": "Sofía",
+  "companyName": "",
+  "pitch": "Estamos en su vecindario instalando internet por solo $35 al mes. Pregunte cuánto paga ahora. Si le interesa, pida su nombre, teléfono y correo para apartarle la instalación.",
+  "plans": [
+    { "name": "Internet", "speed": "", "priceMonthly": 35, "features": [] }
+  ],
+  "policies": {},
+  "promos": [],
+  "customPhrases": [],
+  "facts": {
+    "Price": { "Taxes and fees": "", "Price locked for": "", "Price after that": "" },
+    "Install": { "Install fee": "", "Soonest install": "", "How long it takes": "", "Who must be home": "", "Drilling or new wires": "" },
+    "Contract": { "Contract (yes or no)": "", "Length": "", "Cancellation fee": "", "If they move": "" },
+    "Autopay and paying": { "Autopay required or optional": "", "Autopay discount": "", "Ways to pay": "", "First bill": "" },
+    "Credit and ID": { "Credit check": "", "Social Security number needed": "", "IDs accepted": "", "Deposit": "" },
+    "Speed and Wi-Fi": { "Speed": "", "Fiber, cable or other": "", "Data limit": "", "Wi-Fi coverage or extenders": "" },
+    "Equipment": { "Router included": "", "Equipment fee": "", "Return rules": "" },
+    "Switching": { "Help cancelling the old provider": "", "Buyout of their old fee": "" },
+    "Trust": { "Company name": "", "Rep badge or ID": "", "Number they can call to check": "", "Local store": "" },
+    "Support in Spanish": { "Spanish support number": "", "Hours": "" },
+    "Bundles": { "Other products and bundle prices": "" },
+    "Renting": { "Landlord policy": "" },
+    "Their info": { "Why each piece is needed": "", "Privacy line": "" }
+  }
+}

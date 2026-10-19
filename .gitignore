@@ -28,3 +28,9 @@ android/app/*-release.keystore
 *.jks
 *.p8
 *.p12
+
+# Teammate agent
+teammate-agent/.env
+teammate-agent/.venv/
+__pycache__/
+.pytest_cache/
