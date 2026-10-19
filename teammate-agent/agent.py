@@ -1,7 +1,8 @@
 """Hola Teammate agent: a Spanish-speaking AI teammate for door-to-door reps.
 
 The rep's phone joins a LiveKit room on speakerphone. This agent joins the same room,
-talks with the customer in Spanish on OpenAI's gpt-realtime-2.1, and sends the phone:
+talks with the customer in Spanish on OpenAI's gpt-realtime-2.1 (or GPT-Live-1 with
+ENGINE=live in .env), and sends the phone:
 English captions, price cards, the sign-up form, and any flagged numbers.
 
 Run it:
@@ -33,6 +34,7 @@ from livekit.agents import (
 )
 from livekit.agents.llm import ChatMessage
 from livekit.plugins import openai
+from livekit.plugins.openai.realtime import ResponsesDelegationOptions
 from openai import AsyncOpenAI
 from openai.types.realtime import AudioTranscription, RealtimeReasoning
 from openai.types.realtime.realtime_audio_input_turn_detection import SemanticVad
@@ -45,7 +47,11 @@ HERE = Path(__file__).parent
 load_dotenv(HERE / ".env")
 logger = logging.getLogger("hola-teammate")
 
+ENGINE = os.getenv("ENGINE", "realtime").strip().lower()  # "realtime" or "live"
 REALTIME_MODEL = os.getenv("REALTIME_MODEL", "gpt-realtime-2.1")
+LIVE_MODEL = os.getenv("LIVE_MODEL", "gpt-live-1")
+LIVE_BACKEND_MODEL = os.getenv("LIVE_BACKEND_MODEL", "")  # blank = LiveKit's default backend
+MODEL_NAME = LIVE_MODEL if ENGINE == "live" else REALTIME_MODEL
 VOICE = os.getenv("VOICE", "marin")
 CAPTION_MODEL = os.getenv("CAPTION_MODEL", "gpt-4o-mini")
 TRANSCRIBE_MODEL = os.getenv("TRANSCRIBE_MODEL", "gpt-4o-transcribe")
@@ -182,7 +188,16 @@ class TeammateAgent(Agent):
 
 # ---------------------------------------------------------------- session wiring
 
-def build_model(playbook: Playbook) -> openai.realtime.RealtimeModel:
+def build_model(playbook: Playbook, engine: str | None = None):
+    """ENGINE=realtime: gpt-realtime-2.1, one model listens, thinks and talks, taking turns.
+    ENGINE=live: GPT-Live-1, full duplex (listens while it talks); tools run on a backend model."""
+    if (engine or ENGINE) == "live":
+        backend = ResponsesDelegationOptions(instructions=playbook.instructions(tz=TIMEZONE))
+        if LIVE_BACKEND_MODEL:
+            backend["model"] = LIVE_BACKEND_MODEL
+        return openai.realtime.GPTLiveModel(
+            model=LIVE_MODEL, voice=VOICE, delegation="responses", responses_options=backend
+        )
     keywords = [w for w in [playbook.company_name, playbook.rep_name, playbook.assistant_name,
                             *[p.name for p in playbook.plans]] if w]
     return openai.realtime.RealtimeModel(
@@ -301,7 +316,7 @@ async def entrypoint(ctx: JobContext) -> None:
             user_id=str(meta.get("user_id") or "local"),
             room=getattr(ctx.room, "name", "") or "console",
             seconds=seconds,
-            model=REALTIME_MODEL,
+            model=MODEL_NAME,
             lead_saved=bool(getattr(agent, "lead", None)),
         )
 

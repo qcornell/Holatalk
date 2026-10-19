@@ -32,6 +32,18 @@ Use headphones for this test, so Hola doesn't hear itself through your speakers.
    then speak English as the rep ("tell her install is Saturday"). Try a wrong price on purpose
    ("¿no era $30?") to see the price check work.
 
+## Compare gpt-realtime-2.1 and GPT-Live-1
+
+One line in `.env` picks the AI. Run the same pitch on both and keep the one that sounds more
+like a real person:
+
+| `.env` line | AI | How it talks |
+| --- | --- | --- |
+| `ENGINE=realtime` | gpt-realtime-2.1 | Takes turns. About $0.08 a minute |
+| `ENGINE=live` | GPT-Live-1 | Listens while it talks ("ajá"), waits through pauses. About $0.06 a minute |
+
+Change the line, save, and run `python agent.py console` again.
+
 ## What the phone receives
 
 Messages arrive on the LiveKit data channel, topic `hola`, as JSON:

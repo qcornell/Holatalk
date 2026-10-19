@@ -1,0 +1,27 @@
+import os
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+os.environ.setdefault("OPENAI_API_KEY", "sk-test")  # models need a key to be built, not to be tested
+
+import agent  # noqa: E402
+from playbook import Playbook  # noqa: E402
+
+PB = Playbook.from_file(Path(__file__).resolve().parents[1] / "sample_playbook.json")
+
+
+def test_realtime_engine_builds_gpt_realtime():
+    m = agent.build_model(PB, engine="realtime")
+    assert type(m).__name__ == "RealtimeModel"
+
+
+def test_live_engine_builds_gpt_live():
+    m = agent.build_model(PB, engine="live")
+    assert type(m).__name__ == "GPTLiveModel"
+
+
+def test_both_engines_get_the_same_tools():
+    a = agent.TeammateAgent(PB, agent.PhoneBridge(ctx=None))
+    names = sorted(t.info.name for t in a.tools)
+    assert names == ["ask_rep", "save_lead", "show_price"]
