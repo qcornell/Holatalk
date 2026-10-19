@@ -13,7 +13,7 @@ os.environ.setdefault("OPENAI_API_KEY", "sk-test")
 
 import agent  # noqa: E402
 from number_check import amounts_in_text, payment_pairing_errors  # noqa: E402
-from offer_judge import OfferJudge, build_messages, parse_verdict, worth_checking  # noqa: E402
+from offer_judge import OfferJudge, build_messages, parse_verdict, request_args, worth_checking  # noqa: E402
 from playbook import Playbook  # noqa: E402
 
 PB = Playbook.from_file(Path(__file__).resolve().parents[1] / "sample_playbook.json")
@@ -92,17 +92,41 @@ def test_rep_amounts_are_allowed():
 # ---- the judge
 
 def test_judge_prompt_carries_facts_rep_lines_and_context():
-    msgs = build_messages("Sí, son $30.", PB.facts_text(NOW), ["Deposit is $50"], ["Customer: ¿No era $30?"])
+    msgs = build_messages("Sí, son $30.", PB.judge_facts(NOW), ["Deposit is $50"], ["Customer: ¿No era $30?"])
     user = msgs[1]["content"]
     assert "$45 al mes: Debit card" in user and "- Deposit is $50" in user
-    assert "Customer: ¿No era $30?" in user and user.endswith("Sí, son $30.")
+    assert "(context only, do not judge):\nCustomer: ¿No era $30?" in user
+    assert user.endswith("ANA'S LINE (judge only this):\nSí, son $30.")
 
 
 def test_judge_verdicts_are_parsed_safely():
-    assert parse_verdict('{"ok": true}') is None
-    assert parse_verdict("not json") is None
-    v = parse_verdict('{"ok": false, "problem": "agreed to $30", "fix_es": "Perdón, son $35 al mes."}')
+    line = "Sí, son $30 al mes."
+    assert parse_verdict('{"ok": true}', line) is None
+    assert parse_verdict("not json", line) is None
+    v = parse_verdict('{"ok": false, "quote": "son $30 al mes", "problem": "agreed to $30", '
+                      '"fix_es": "Perdón, son $35 al mes."}', line)
     assert v["problem"] == "agreed to $30" and v["fix_es"].startswith("Perdón")
+
+
+def test_a_flag_about_words_ana_didnt_say_is_ignored():
+    # in the first live test the judge flagged a line with no price in it, judging an earlier line
+    line = "La instalación es gratis y no hay contrato. ¿Ya tiene una tele inteligente?"
+    raw = '{"ok": false, "quote": "35 dólares al mes", "problem": "price not in facts", "fix_es": "..."}'
+    assert parse_verdict(raw, line) is None
+    assert parse_verdict('{"ok": false, "problem": "no quote given"}', line) is None
+
+
+def test_judge_settings_fit_the_model():
+    m = [{"role": "user", "content": "x"}]
+    luna = request_args("gpt-5.6-luna", m)
+    assert luna["reasoning_effort"] == "low" and "temperature" not in luna and "max_completion_tokens" in luna
+    classic = request_args("gpt-4.1", m)
+    assert classic["temperature"] == 0 and "reasoning_effort" not in classic
+
+
+def test_judge_sees_the_pitch_as_approved_wording():
+    facts = PB.judge_facts(NOW)
+    assert facts.startswith("Rep's pitch (approved wording):") and "normalmente solo necesitamos su nombre" in facts
 
 
 def test_judge_uses_the_model_and_survives_errors():
@@ -119,10 +143,11 @@ def test_judge_uses_the_model_and_survives_errors():
             return SimpleNamespace(choices=[SimpleNamespace(message=msg)])
 
     async def run():
-        bad = Client({"ok": False, "problem": "agreed to the customer's $30", "fix_es": "Perdón, son $35."})
+        bad = Client({"ok": False, "quote": "Sí, $30", "problem": "agreed to the customer's $30", "fix_es": "Perdón, son $35."})
         v = await OfferJudge(bad).check("Sí, $30.", "facts", [], [])
         assert v and "agreed" in v["problem"]
-        assert bad.calls[0]["response_format"] == {"type": "json_object"} and bad.calls[0]["temperature"] == 0
+        assert bad.calls[0]["response_format"] == {"type": "json_object"}
+        assert bad.calls[0]["model"] == (os.getenv("JUDGE_MODEL") or "gpt-5.6-luna")
         assert await OfferJudge(Client({"ok": True})).check("Son $35.", "facts", [], []) is None
         assert await OfferJudge(Client(fail=True)).check("Son $35.", "facts", [], []) is None
     asyncio.run(run())
@@ -164,3 +189,12 @@ def test_daily_price_check():
     assert not pb.needs_review("2026-10-19")
     assert pb.needs_review("2026-10-20")
     assert Playbook.from_dict({"repName": "Max"}).needs_review("2026-10-19")
+
+
+# ---- transcription settings (the "'languages' parameter is not supported" error)
+
+def test_transcription_settings_fit_the_model():
+    new = agent.transcription_settings(PB, "gpt-transcribe")
+    assert new.languages == ["es", "en"] and "Max" in new.keywords and new.prompt is None
+    old = agent.transcription_settings(PB, "gpt-4o-transcribe")
+    assert old.languages is None and old.keywords is None and "Max" in old.prompt

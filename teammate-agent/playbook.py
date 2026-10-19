@@ -234,6 +234,11 @@ class Playbook:
         return (f"Plans:\n{plans}\nPolicies:\n{policies}\nCurrent promos:\n{promos}\n"
                 f"Rep's answers to common questions:\n{facts}\nRep's custom lines:\n{phrases}")
 
+    def judge_facts(self, now: datetime | None = None) -> str:
+        """What the offer judge checks Ana against: the rep's pitch (approved wording) plus the facts."""
+        pitch = f"Rep's pitch (approved wording):\n{self.pitch}\n" if self.pitch else ""
+        return pitch + self.facts_text(now)
+
     def instructions(self, now: datetime | None = None, tz: str = "America/Chicago") -> str:
         now = now or local_now(tz)
         has_options = any(len(p.price_options) > 1 for p in self.plans)

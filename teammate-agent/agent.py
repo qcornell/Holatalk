@@ -64,7 +64,7 @@ LIVE_BACKEND_MODEL = os.getenv("LIVE_BACKEND_MODEL", "")  # blank = LiveKit's de
 MODEL_NAME = LIVE_MODEL if ENGINE == "live" else REALTIME_MODEL
 VOICE = os.getenv("VOICE", "marin")
 CAPTION_MODEL = os.getenv("CAPTION_MODEL", "gpt-4o-mini")
-TRANSCRIBE_MODEL = os.getenv("TRANSCRIBE_MODEL", "gpt-4o-transcribe")
+TRANSCRIBE_MODEL = os.getenv("TRANSCRIBE_MODEL", "gpt-transcribe")
 SILENCE_SECONDS = float(os.getenv("SILENCE_SECONDS", "30"))
 REP_WAIT_SECONDS = float(os.getenv("REP_WAIT_SECONDS", "15"))  # then Ana says "Max?" once, then carries on
 MAX_MINUTES = float(os.getenv("MAX_MINUTES", "20"))
@@ -425,20 +425,30 @@ def build_model(playbook: Playbook, engine: str | None = None):
         return openai.realtime.GPTLiveModel(
             model=LIVE_MODEL, voice=VOICE, delegation="responses", responses_options=backend
         )
-    keywords = [w for w in [playbook.company_name, playbook.rep_name, playbook.assistant_name,
-                            *[p.name for p in playbook.plans]] if w]
     return openai.realtime.RealtimeModel(
         model=REALTIME_MODEL,
         voice=VOICE,
-        input_audio_transcription=AudioTranscription(
-            model=TRANSCRIBE_MODEL, languages=["es", "en"], keywords=keywords
-        ),
+        input_audio_transcription=transcription_settings(playbook, TRANSCRIBE_MODEL),
         input_audio_noise_reduction="far_field",  # phone on speaker, held at arm's length
         turn_detection=SemanticVad(
             type="semantic_vad", eagerness="auto", create_response=True, interrupt_response=True
         ),
         reasoning=RealtimeReasoning(effort=os.getenv("REASONING_EFFORT", "low")),
     )
+
+
+def transcription_settings(playbook: Playbook, model: str) -> AudioTranscription:
+    """How the customer's and rep's speech is written down. gpt-transcribe and gpt-live-transcribe
+    take a language list and keywords; older models (gpt-4o-transcribe) take a prompt instead, and
+    reject the others (that was the "'languages' parameter is not supported" error)."""
+    keywords = [w for w in [playbook.company_name, playbook.rep_name, playbook.assistant_name,
+                            *[p.name for p in playbook.plans]] if w]
+    if model in ("gpt-transcribe", "gpt-live-transcribe"):
+        return AudioTranscription(model=model, languages=["es", "en"], keywords=keywords)
+    prompt = "Spanish and English at a customer's front door, about a sales offer."
+    if keywords:
+        prompt += " Names: " + ", ".join(keywords) + "."
+    return AudioTranscription(model=model, prompt=prompt)
 
 
 def load_playbook(ctx: JobContext) -> tuple[Playbook, dict[str, Any]]:
@@ -463,8 +473,8 @@ server = AgentServer()
 async def entrypoint(ctx: JobContext) -> None:
     playbook, meta = load_playbook(ctx)
     phone = PhoneBridge(ctx)
-    captions = Captioner()
-    judge = OfferJudge()
+    captions = await asyncio.to_thread(Captioner)  # building these clients takes ~0.5 s; keep it off the audio loop
+    judge = await asyncio.to_thread(OfferJudge)
     started = time.monotonic()
     tasks: set[asyncio.Task] = set()
     console = ctx.is_fake_job()
@@ -472,7 +482,7 @@ async def entrypoint(ctx: JobContext) -> None:
     today = now_local()
     base_amounts = playbook.allowed_amounts(now=today)
     pairing = playbook.pairing_options()
-    facts = playbook.facts_text(today)
+    facts = playbook.judge_facts(today)
     rep_amounts: set[float] = set()        # amounts the rep said (from his phone, or answering a check-in)
     customer_amounts: set[float] = set()   # amounts anyone else said: fine to repeat, never our price
     rep_said: list[str] = []
@@ -505,6 +515,7 @@ async def entrypoint(ctx: JobContext) -> None:
                 problem, fix = judged["problem"], judged["fix_es"]
         if not problem:
             return
+        logger.info("flagged (%s): %s", verdict, problem)  # what was wrong, not who said what
         await phone.send("flag", said=text, problem=problem)
         if corrections["count"] < 3:  # never loop on corrections
             corrections["count"] += 1
