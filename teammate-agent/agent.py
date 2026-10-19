@@ -29,7 +29,6 @@ from collections import deque
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
-from zoneinfo import ZoneInfo
 
 from dotenv import load_dotenv
 from livekit.agents import (
@@ -51,7 +50,7 @@ from openai.types.realtime.realtime_audio_input_turn_detection import SemanticVa
 from leads import store_lead
 from number_check import amounts_in_text, expand_allowed, payment_pairing_errors, unexpected_amounts
 from offer_judge import OfferJudge, worth_checking
-from playbook import Playbook
+from playbook import Playbook, local_now
 from usage import log_session
 
 HERE = Path(__file__).parent
@@ -76,7 +75,7 @@ CALLBACK_MAX_DAYS = 60
 
 
 def now_local() -> datetime:
-    return datetime.now(ZoneInfo(TIMEZONE))
+    return local_now(TIMEZONE)
 
 
 # ---------------------------------------------------------------- phone messages

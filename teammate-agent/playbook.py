@@ -23,7 +23,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Any
-from zoneinfo import ZoneInfo
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from number_check import amounts_in_text
 from sales_skills import sales_skills_text
@@ -189,7 +189,7 @@ class Playbook:
     # ---------- the instructions Hola runs on ----------
 
     def greeting(self, now: datetime | None = None, tz: str = "America/Chicago") -> str:
-        now = now or datetime.now(ZoneInfo(tz))
+        now = now or local_now(tz)
         h = now.hour
         saludo = "buenos días" if h < 12 else "buenas tardes" if h < 19 else "buenas noches"
         return f"¡Hola, {saludo}! Soy {self.assistant_name}, la asistente virtual de {self.rep_name}. ¿Cómo está?"
@@ -235,7 +235,7 @@ class Playbook:
                 f"Rep's answers to common questions:\n{facts}\nRep's custom lines:\n{phrases}")
 
     def instructions(self, now: datetime | None = None, tz: str = "America/Chicago") -> str:
-        now = now or datetime.now(ZoneInfo(tz))
+        now = now or local_now(tz)
         has_options = any(len(p.price_options) > 1 for p in self.plans)
         paying_rule = (
             "\n- How they pay changes the price (see Plans). The pitch price is the lowest one. Before you say a "
@@ -332,6 +332,15 @@ If a question is not answered by the facts above, call the ask_rep tool and tell
   never put it in save_lead.
 - If the customer clearly says no twice, thank them kindly and stop pitching.
 """.strip()
+
+
+def local_now(tz: str = "America/Chicago") -> datetime:
+    """The time in the rep's time zone. Windows has no time zone data unless the tzdata package is
+    installed; if it's missing, use the computer's own clock and zone instead of crashing."""
+    try:
+        return datetime.now(ZoneInfo(tz))
+    except (ZoneInfoNotFoundError, ValueError):
+        return datetime.now().astimezone()
 
 
 def _num(v: Any) -> float | None:

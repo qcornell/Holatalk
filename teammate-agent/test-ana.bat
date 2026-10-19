@@ -24,6 +24,8 @@ if not exist ".venv\Scripts\activate.bat" (
   if errorlevel 1 ( echo. & echo Setup failed. Send Claude a screenshot of this window. & pause & exit /b )
 ) else (
   call ".venv\Scripts\activate.bat"
+  pip install --quiet --disable-pip-version-check -r requirements.txt
+  if errorlevel 1 ( echo. & echo Update failed. Send Claude a screenshot of this window. & pause & exit /b )
 )
 
 if not exist ".env" copy ".env.example" ".env" >nul
