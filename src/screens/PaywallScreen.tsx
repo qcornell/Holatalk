@@ -144,7 +144,7 @@ export default function PaywallScreen({ onSubscribed, assistantName = 'Ana', mod
         <Text style={[s.sub, changing && s.subLeft]}>
           {changing
             ? `${currentPlan ? `You're on ${currentPlan}. ` : ''}Minutes reset every month. Switching up starts right away.`
-            : `She talks with your Spanish-speaking customers, quotes only your prices, and checks with you. Pick how many minutes you need.`}
+            : `Pick how many minutes you need. Every plan has Convo and Teach Me.`}
         </Text>
 
         <View style={s.plans} accessibilityRole="radiogroup">
@@ -187,6 +187,16 @@ export default function PaywallScreen({ onSubscribed, assistantName = 'Ana', mod
           })}
           {!plans.length ? <Text style={s.empty}>Plans couldn't load from the App Store. Check your connection and try again.</Text> : null}
         </View>
+        {plans.length ? (
+          <View style={s.notes}>
+            {['Minutes reset monthly', 'Switch anytime', 'English captions'].map((t) => (
+              <View key={t} style={s.note}>
+                <CheckIcon size={16} color={C.accent} />
+                <Text style={s.noteText}>{t}</Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
 
 
         <View style={{ flex: 1, minHeight: 20 }} />
@@ -263,6 +273,9 @@ const s = StyleSheet.create({
   tagMine: { height: 22, paddingHorizontal: 8, borderRadius: 11, backgroundColor: '#2A2A30', justifyContent: 'center' },
   tagMineText: { fontSize: 12, fontWeight: '700', color: C.chipText },
   empty: { fontSize: 15, lineHeight: 21, color: C.onDark2 },
+  notes: { marginTop: 12, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', columnGap: 14, rowGap: 6 },
+  note: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  noteText: { fontSize: 14, color: C.onDark2 },
   priceBlock: { alignItems: 'center', gap: 2, marginBottom: 14 },
   priceMain: { fontSize: 20, fontWeight: '800', color: C.onDark },
   priceSub: { fontSize: 15, color: C.onDark2, textAlign: 'center' },

@@ -13,6 +13,7 @@ import {
   StatusBar,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -43,6 +44,36 @@ function clock(seconds: number): string {
   const m = Math.floor(seconds / 60);
   const s = seconds % 60;
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+
+/* ── Ana's photo, with a ring that glows while she talks ── */
+function GlowAvatar({ talking }: { talking: boolean }) {
+  const pulse = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (!talking) {
+      Animated.timing(pulse, { toValue: 0, duration: 300, useNativeDriver: true }).start();
+      return;
+    }
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 1, duration: 650, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 0.35, duration: 650, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [talking, pulse]);
+  return (
+    <View style={st.avatarWrap}>
+      <Animated.View
+        style={[
+          st.glow,
+          { opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.35, 1] }), transform: [{ scale: pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.06] }) }] },
+        ]}
+      />
+      <Image source={ANA} style={st.avatar} accessibilityLabel="Representante en español" />
+    </View>
+  );
 }
 
 /* ── the voice wave on the customer's side ── */
@@ -411,6 +442,7 @@ export default function TeammateCallScreen({
   onPlans?: () => void;
 }) {
   useKeepAwake();
+  const { height } = useWindowDimensions();
   const call = useTeammateCall(settings);
   const { state } = call;
   const [notesOpen, setNotesOpen] = useState(false);
@@ -480,6 +512,9 @@ export default function TeammateCallScreen({
   const status =
     state.phase === 'live' ? 'En llamada' : state.phase === 'waiting' ? 'Conectando…' : 'Llamando…';
   const priceUp = showPrice && !!price;
+  // what Ana just said, in Spanish for the customer and English for you
+  const lastAna = [...state.captions].reverse().find((c) => c.who === 'ana') ?? null;
+  const tall = height >= 840; // room for the wave and the caption together
 
   return (
     <SafeAreaView style={st.root}>
@@ -496,17 +531,31 @@ export default function TeammateCallScreen({
         </View>
       ) : (
         <View style={st.callHead}>
-          <Image source={ANA} style={st.avatar} accessibilityLabel="Representante en español" />
-          <Text style={st.name}>Representante en español</Text>
+          <GlowAvatar talking={state.phase === 'live' && state.anaTalking} />
+          <Text style={st.name} numberOfLines={1} adjustsFontSizeToFit>
+            Representante en español
+          </Text>
           <View style={st.statusRow}>
             <PhoneIcon size={20} color={ACCENT} />
             <Text style={st.statusText}>{status}</Text>
           </View>
           <Text style={st.timer}>{clock(state.seconds)}</Text>
-          <Wave active={state.phase === 'live' && state.anaTalking} />
-          <Text style={st.talking}>
-            {state.phase !== 'live' ? ' ' : state.anaTalking ? 'Está hablando…' : 'Está escuchando…'}
-          </Text>
+          {!lastAna || tall ? <Wave active={state.phase === 'live' && state.anaTalking} /> : null}
+          {!lastAna ? (
+            <Text style={st.talking}>{state.phase !== 'live' ? ' ' : state.anaTalking ? 'Está hablando…' : 'Está escuchando…'}</Text>
+          ) : null}
+          {lastAna ? (
+            <View style={st.liveCard} accessibilityLiveRegion="polite">
+              <Text style={st.liveEs} numberOfLines={3}>
+                {lastAna.text}
+              </Text>
+              {lastAna.en ? (
+                <Text style={st.liveEn} numberOfLines={2}>
+                  {lastAna.en}
+                </Text>
+              ) : null}
+            </View>
+          ) : null}
         </View>
       )}
       {priceUp && price ? (
@@ -572,15 +621,31 @@ export default function TeammateCallScreen({
 
 const st = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#050507' },
-  callHead: { alignItems: 'center', paddingTop: 56, paddingHorizontal: 28 },
-  avatar: { width: 172, height: 172, borderRadius: 86, borderWidth: 3, borderColor: '#FFFFFF' },
-  name: { marginTop: 28, fontSize: 28, lineHeight: 32, fontWeight: '600', color: '#FFFFFF', textAlign: 'center' },
+  callHead: { alignItems: 'center', paddingTop: 36, paddingHorizontal: 24 },
+  avatarWrap: { width: 152, height: 152, alignItems: 'center', justifyContent: 'center' },
+  glow: {
+    position: 'absolute',
+    width: 152,
+    height: 152,
+    borderRadius: 76,
+    borderWidth: 3,
+    borderColor: ACCENT,
+    shadowColor: ACCENT,
+    shadowOpacity: 0.9,
+    shadowRadius: 22,
+    shadowOffset: { width: 0, height: 0 },
+  },
+  avatar: { width: 138, height: 138, borderRadius: 69 },
+  name: { marginTop: 18, fontSize: 26, lineHeight: 32, fontWeight: '600', color: '#FFFFFF', textAlign: 'center' },
   statusRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12 },
   statusText: { color: ACCENT, fontSize: 18, fontWeight: '600' },
   timer: { marginTop: 8, fontSize: 20, color: '#C7C7CC', fontVariant: ['tabular-nums'] },
-  wave: { flexDirection: 'row', alignItems: 'center', gap: 5, height: 64, marginTop: 34 },
+  wave: { flexDirection: 'row', alignItems: 'center', gap: 5, height: 56, marginTop: 14 },
   bar: { width: 4, borderRadius: 2, backgroundColor: ACCENT },
-  talking: { marginTop: 14, fontSize: 15, color: '#A1A1AA' },
+  talking: { marginTop: 10, fontSize: 15, color: '#A1A1AA' },
+  liveCard: { alignSelf: 'stretch', marginTop: 14, backgroundColor: '#0E1D17', borderWidth: 1, borderColor: '#1F5E48', borderRadius: 20, paddingVertical: 14, paddingHorizontal: 16, gap: 6 },
+  liveEs: { fontSize: 18, lineHeight: 24, fontWeight: '600', color: '#FFFFFF' },
+  liveEn: { fontSize: 14, lineHeight: 19, color: '#A7D9C4' },
 
   compactHead: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 24, paddingTop: 24 },
   avatarSmall: { width: 60, height: 60, borderRadius: 30, borderWidth: 2, borderColor: '#FFFFFF' },

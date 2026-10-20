@@ -5,7 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import type { TeammateSettings } from '../teammate/settings';
 import { needsDailyCheck, priceChips } from '../teammate/settings';
 import { industry } from '../teammate/industries';
-import { ChatIcon, ChevronIcon, GearIcon, PersonIcon, PhoneIcon } from '../teammate/icons';
+import { ChatIcon, CheckIcon, ChevronIcon, GearIcon, PersonIcon, PhoneIcon } from '../teammate/icons';
 import type { DayStats } from './stats';
 import type { PlanStatus } from './account';
 import { resetsOn } from './account';
@@ -126,7 +126,10 @@ export default function HomeScreen({
               style={({ pressed }) => [st.callBtn, pressed && { opacity: 0.85, transform: [{ scale: 0.99 }] }]}
             >
               <PhoneIcon size={24} color={C.ground} />
-              <Text style={st.callText}>Call {assistant}</Text>
+              <View>
+                <Text style={st.callText}>Call {assistant}</Text>
+                <Text style={st.callSub}>Start a Spanish conversation</Text>
+              </View>
             </Pressable>
           </View>
         </View>
@@ -134,10 +137,16 @@ export default function HomeScreen({
         <View style={st.sheet}>
           <View style={st.stats}>
             <View style={st.stat}>
+              <View style={[st.statIcon, { backgroundColor: C.greenBg }]}>
+                <PhoneIcon size={18} color={C.green} />
+              </View>
               <Text style={st.statNum}>{stats.calls}</Text>
               <Text style={st.statLabel}>Calls with {assistant} today</Text>
             </View>
             <View style={st.stat}>
+              <View style={[st.statIcon, { backgroundColor: C.blueBg }]}>
+                <CheckIcon size={18} color="#1D4ED8" />
+              </View>
               <Text style={[st.statNum, { color: C.green }]}>{stats.signups}</Text>
               <Text style={st.statLabel}>{settings.industry === 'ministry' ? 'Yes to the invite today' : 'Sign-ups today'}</Text>
             </View>
@@ -208,8 +217,10 @@ const st = StyleSheet.create({
   planNote: { fontSize: 14, color: C.onDark3 },
   chip: { height: 30, paddingHorizontal: 12, borderRadius: 15, backgroundColor: '#1E1E24', justifyContent: 'center', maxWidth: '100%' },
   chipText: { fontSize: 14, fontWeight: '600', color: C.chipText },
-  callBtn: { height: 64, borderRadius: 32, backgroundColor: C.accent, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
+  callBtn: { height: 70, borderRadius: 35, backgroundColor: C.accent, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
   callText: { fontSize: 20, fontWeight: '800', color: C.ground },
+  callSub: { fontSize: 13, fontWeight: '600', color: '#0B3B2A' },
+  statIcon: { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginBottom: 6 },
   sheet: { flex: 1, marginTop: 22, backgroundColor: C.sheet, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingTop: 20, paddingHorizontal: 20, paddingBottom: 40, gap: 14 },
   stats: { flexDirection: 'row', gap: 12 },
   stat: { flex: 1, backgroundColor: C.card, borderWidth: 1, borderColor: C.line, borderRadius: 18, paddingVertical: 14, paddingHorizontal: 16, gap: 2 },
