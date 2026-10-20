@@ -87,10 +87,20 @@ class FakeStore:
         return self.ok
 
 
-def make_agent(ok=True):
+READ_BACK = [
+    ("ana", "Su número es nueve, siete, nueve, cinco, cinco, cinco, cero, uno, cuatro, dos. ¿Está correcto?"),
+    ("customer", "Sí."),
+    ("ana", "Y su correo es m-a-r-i-a arroba ejemplo punto com. ¿Está correcto?"),
+    ("customer", "Sí, está correcto."),
+]
+
+
+def make_agent(ok=True, lines=READ_BACK):
     phone, store = FakePhone(), FakeStore(ok)
     a = agent.TeammateAgent(PB, phone, call_id="room-1", user_id="quentin", store=store)
     a.wait_for_rep = lambda: None  # no timers in tests
+    for who, text in lines:
+        a.heard(who, text)
     return a, phone, store
 
 
@@ -141,6 +151,9 @@ def test_save_lead_refuses_bad_or_unconfirmed_details():
         assert "isn't a way to pay" in out
         assert store.rows == [] and phone.sent == []
         # no email is fine when they truly have none; payment not chosen yet means no price
+        a.lines.clear()
+        a.heard("ana", "Su número es 979 555 0142. ¿Está correcto?")
+        a.heard("customer", "Sí, así es.")
         out = await a.save_lead(None, "María López", "9795550142", "none", True)
         assert out.startswith("Saved")
         assert store.rows[0]["email"] == "" and store.rows[0]["monthly"] is None
@@ -227,7 +240,6 @@ def test_instructions_call_him_over_every_time():
             "talking and wait. Don't ask him anything yet.") in section
     assert 'the next short English reply ("yeah", "go ahead", "I\'m here") is Quentin answering you' in " ".join(TEXT.split())
     assert "skip \"are you there?\"" in section  # not when he just spoke to her
-    assert "Quentin, are you\n    there?" in TEXT  # also before asking him about English
 
 
 def test_calls_rep_spots_are_you_there():
@@ -307,3 +319,60 @@ def test_asking_again_after_he_answers_does_not_call_him_over_twice():
         await a.on_exit()
     asyncio.run(run())
 
+
+
+def test_never_saves_what_the_customer_said_was_wrong():
+    """From a real test call: she spelled the email back, the customer said no and gave it again, and
+    she saved the wrong one as confirmed."""
+    call = [
+        ("ana", "For the phone number, I have 9 7 9, 5 9 5, 6 3 3 0. Is that correct?"),
+        ("customer", "Yes."),
+        ("ana", "I heard j u c, at gmail dot com. Is that exactly right?"),
+        ("customer", "No."),
+        ("customer", "qc@gmail.com."),
+        ("customer", "QC."),
+    ]
+
+    async def run():
+        a, phone, store = make_agent(lines=call)
+        out = await a.save_lead(None, "Mary Smith", "9795956330", "juc@gmail.com", True)
+        assert out.startswith("Not saved yet: they said the email you read back isn't right")
+        assert store.rows == [] and phone.sent == []
+        # the fixed email still has to be spelled back and get a yes
+        out = await a.save_lead(None, "Mary Smith", "9795956330", "qc@gmail.com", True)
+        assert "spell the email back letter by letter" in out and store.rows == []
+        a.heard("ana", "Okay: q, c, at gmail dot com. Is that right?")
+        a.heard("customer", "Yeah, that's right.")
+        out = await a.save_lead(None, "Mary Smith", "9795956330", "qc@gmail.com", True)
+        assert out.startswith("Saved") and store.rows[0]["email"] == "qc@gmail.com"
+    asyncio.run(run())
+
+
+def test_read_back_must_be_the_real_number_and_get_an_answer():
+    async def run():
+        # she read back only 8 digits and moved on: not confirmed
+        a, _, store = make_agent(lines=[("ana", "Thanks. I got 9 7 9, 5 6 3, 3 0. Now your email?"),
+                                        ("customer", "qc@gmail.com")])
+        out = await a.save_lead(None, "Mary Smith", "9795956330", "qc@gmail.com", True)
+        assert "read the phone number back digit by digit" in out and store.rows == []
+        # read back but no answer yet
+        a.heard("ana", "Su número es 9 7 9 5 9 5 6 3 3 0 y su correo es cu, ce, arroba gmail punto com. ¿Está bien?")
+        out = await a.save_lead(None, "Mary Smith", "9795956330", "qc@gmail.com", True)
+        assert "haven't said yes" in out and store.rows == []
+        a.heard("customer", "Sí, todo bien.")
+        assert (await a.save_lead(None, "Mary Smith", "9795956330", "qc@gmail.com", True)).startswith("Saved")
+    asyncio.run(run())
+
+
+def test_call_over_lines_follow_the_customers_language():
+    async def run():
+        a, _, _ = make_agent()
+        a.heard("ana", "Great. We offer internet in the area for $35 a month. Do you have a smart TV?")
+        out = await a.ask_rep(None, "Is there a deposit?")
+        assert '"Good question. Let me check with Quentin. Quentin, are you there?"' in out
+        assert "in your own words" in out and "Spanish" not in out
+        a.heard("ana", "Claro, la instalación es gratis. ¿Ya tiene tele inteligente?")
+        a._talk_until = 0
+        out = await a.ask_rep(None, "Can they get installed Saturday?")
+        assert '"Buena pregunta. Déjeme confirmarlo con Quentin. Quentin, are you there?"' in out
+    asyncio.run(run())

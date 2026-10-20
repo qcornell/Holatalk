@@ -200,13 +200,12 @@ def test_transcription_settings_fit_the_model():
     assert old.languages is None and old.keywords is None and "Quentin" in old.prompt
 
 
-def test_ana_switches_to_english_when_the_rep_asks():
-    text = PB.instructions(NOW)
-    assert "If Quentin asks you to speak English" in text and "switch right away" in text
-    flat = " ".join(text.split())
-    assert ('"Quentin, are you there?" and wait. When he answers: "They\'d like English. Do you want to take '
-            'it, or should I keep going in English?"') in flat
-    assert "Always answer the customer in Spanish" not in text
+def test_ana_switches_to_english_when_anyone_asks():
+    flat = " ".join(PB.instructions(NOW).split())
+    assert '"you can say it in English"' in flat and "switch right away" in flat
+    assert "Don't check with Quentin first: he can hear you." in flat
+    assert "Do you want to take it" not in flat  # no more check-in before switching
+    assert "Always answer the customer in Spanish" not in flat
 
 
 def test_ana_asks_the_rep_instead_of_listing_what_she_doesnt_know():

@@ -53,6 +53,7 @@ from leads import store_lead
 from number_check import amounts_in_text, expand_allowed, payment_pairing_errors, unexpected_amounts
 from offer_judge import OfferJudge, worth_checking
 from playbook import Playbook, local_now
+from readback import readback_problem
 from usage import log_session
 
 HERE = Path(__file__).parent
@@ -231,6 +232,19 @@ class TeammateAgent(Agent):
         self._nudged = False      # she already said his name a second time
         self._talk_until = 0.0    # he answered her: his English counts as him until then
         self._last_question = ""  # the last question shown on his phone
+        self.lines: deque[tuple[str, str]] = deque(maxlen=60)  # (who, text): "ana", "customer" or "rep"
+
+    def heard(self, who: str, text: str) -> None:
+        """A finished line of the conversation, as transcribed."""
+        self.lines.append((who, text))
+
+    def speaking_english(self) -> bool:
+        """Ana's last line to the customer (not one calling the rep) was in English."""
+        rep = self.playbook.rep_name.lower()
+        for who, text in reversed(self.lines):
+            if who == "ana" and not (rep and rep in text.lower()):
+                return looks_english(text)
+        return False
 
     async def on_enter(self) -> None:
         self.session.generate_reply(
@@ -297,14 +311,15 @@ class TeammateAgent(Agent):
                 logger.debug("nudge skipped: %s", e)
                 return
 
-    def _call_over(self, before: str, spanish: str, then: str) -> str:
-        """Ana turns from the customer to the rep: a Spanish line for the customer, then his name in English,
-        because he can't tell when her Spanish is meant for him. Then she waits for him. `then` is what she
-        does once he answers. (Having the app force the line with generate_reply tested worse: she ignored
-        it. One exact line in the tool result works.)"""
+    def _call_over(self, before: str, to_customer: tuple[str, str], then: str) -> str:
+        """Ana turns from the customer to the rep: a line for the customer (Spanish, or English if they
+        switched), then his name in English, because he can't tell when her Spanish is meant for him. Then
+        she waits for him. `then` is what she does once he answers. (Having the app force the line with
+        generate_reply tested worse: she ignored it. One exact line in the tool result works.)"""
         rep = self.playbook.rep_name
+        line = to_customer[1] if self.speaking_english() else to_customer[0]
         self.wait_for_rep()
-        return (f'{before}Say exactly this now, all of it, then stop and wait: "{spanish} {rep}, are you there?" '
+        return (f'{before}Say exactly this now, all of it, then stop and wait: "{line} {rep}, are you there?" '
                 f"Don't say anything else to {rep} yet. Only after {rep} answers you (a short English reply like "
                 f"\"yeah\", \"go ahead\" or \"I'm here\" is {rep}): {then}")
 
@@ -386,6 +401,11 @@ class TeammateAgent(Agent):
         if not customer_confirmed:
             return ("Not saved yet: read the phone number back digit by digit and spell the email back, then call "
                     "save_lead again once they say it's right.")
+        same = self.lead and self.lead["phone"] == digits and self.lead["email"] == mail
+        if not same:  # check the transcript too, not just her word for it
+            problem = await self._readback_problem(digits, mail)
+            if problem:
+                return f"Not saved yet: {problem}"
         fields = {
             "name": name, "phone": digits, "email": mail,
             "plan": chosen.name if chosen else plan.strip(),
@@ -397,7 +417,7 @@ class TeammateAgent(Agent):
             await self.phone.send("lead", status="not_saved", fields=fields)
             return self._call_over(
                 "NOT saved: the save didn't go through. Don't tell the customer it's saved. ",
-                "Un momentito, por favor.",
+                ("Un momentito, por favor.", "One moment, please."),
                 "say in English: \"The save didn't go through. Can you write down their info?\" Then carry on.")
         first_save = not self.lead
         self.lead = fields
@@ -407,9 +427,19 @@ class TeammateAgent(Agent):
         await self.phone.send("check_in", reason="sign-up saved")
         return self._call_over(
             f"Saved. Now you're checking in with {rep}. ",
-            f"Perfecto, ya quedó. Un momentito, déjeme hablar con {rep}.",
+            (f"Perfecto, ya quedó. Un momentito, déjeme hablar con {rep}.",
+             f"Perfect, you're all set. One moment, let me check with {rep}."),
             "say in English: \"I've got their name, number and email. Anything else you want me to ask or "
             "explain?\" Then wait for his answer. If they tell you how they'll pay later, call save_lead again with it.")
+
+    async def _readback_problem(self, phone: str, email: str) -> str:
+        problem = readback_problem(list(self.lines), phone, email)
+        for _ in range(6):  # their "sí" may still be being transcribed
+            if not problem.startswith("they haven't said yes"):
+                break
+            await asyncio.sleep(0.25)
+            problem = readback_problem(list(self.lines), phone, email)
+        return problem
 
     @function_tool
     async def ask_rep(self, context: RunContext, question: str) -> str:
@@ -421,9 +451,13 @@ class TeammateAgent(Agent):
                 or "Can they get installed Saturday?"
         """
         rep = self.playbook.rep_name
-        then_answer = ("When he answers, turn back to the customer and give them his answer in Spanish, keeping "
-                       "his numbers and details exactly (translate it; don't repeat his English or say \"él dijo\"). "
-                       "Then carry on.")
+        if self.speaking_english():
+            then_answer = ("When he answers, turn back to the customer and give them his answer in your own words, "
+                           "keeping his numbers and details exactly. Then carry on.")
+        else:
+            then_answer = ("When he answers, turn back to the customer and give them his answer in Spanish, keeping "
+                           "his numbers and details exactly (translate it; don't repeat his English or say "
+                           "\"él dijo\"). Then carry on.")
         if self._calling:  # she already called him over and he hasn't answered yet
             return f'You already called {rep}. Wait. When he answers, ask him in English: "{question}" and stop.'
         if question != self._last_question:
@@ -435,7 +469,7 @@ class TeammateAgent(Agent):
                     f"Say nothing to the customer while you wait. {then_answer}")
         return self._call_over(
             "",
-            f"Buena pregunta. Déjeme confirmarlo con {rep}.",
+            (f"Buena pregunta. Déjeme confirmarlo con {rep}.", f"Good question. Let me check with {rep}."),
             f'ask him in English: "{question}" and stop. Say nothing to the customer while you wait. (If he '
             f"already answered it, don't ask again.) {then_answer}")
 
@@ -466,7 +500,7 @@ class TeammateAgent(Agent):
                                   when=when_spoken.strip(), at=at.isoformat())
             return self._call_over(
                 "NOT saved: the save didn't go through. ",
-                "Un momentito, por favor.",
+                ("Un momentito, por favor.", "One moment, please."),
                 "say in English: \"The callback didn't save. Can you write it down?\" Then repeat the day and time "
                 "back to the customer.")
         await self.phone.send("callback", status="saved", name=name.strip(), phone=digits, when=when_spoken.strip(),
@@ -622,6 +656,7 @@ async def entrypoint(ctx: JobContext) -> None:
                 customer_amounts.update(amounts)
             label = "Rep" if is_rep else "English speaker" if english else "Customer"
             recent.append(f"{label}: {clean}")
+            agent.heard("rep" if is_rep else "customer", clean)
             spawn(caption("rep" if is_rep or english else "customer", clean, verified=is_rep))
         elif item.role == "assistant":
             if agent.ana_said(text):  # "Quentin, are you there?": buzz his phone
@@ -629,6 +664,7 @@ async def entrypoint(ctx: JobContext) -> None:
             spawn(caption("hola", text))
             spawn(check_offer(text, list(recent)))
             recent.append(f"Ana: {text}")
+            agent.heard("ana", text)
 
     def _on_data(packet) -> None:
         """The rep tapped a quick reply, or used his hold-to-talk button, on his phone."""
