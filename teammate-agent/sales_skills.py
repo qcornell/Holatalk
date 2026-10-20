@@ -29,15 +29,17 @@ DOOR_TYPES: list[dict[str, object]] = [
         "name": "Thinks the phone hotspot is enough (very careful with money)",
         "signs": '"Uso el hotspot", "Tengo datos en el celular", "Es un gasto extra"',
         "steps": [
-            'Agree with saving money: "Tiene razón en cuidar su dinero."',
-            'Ask: "¿Sus datos son ilimitados, o se le acaban o se le pone lento a fin de mes?" and '
-            '"¿Cuántas personas en su casa usan el internet del celular?"',
-            "Paint the difference without overclaiming: hotspot data often runs out or slows down, it's usually "
-            "slower for videos and the TV, they have to connect it each time, and it drains the phone battery. "
-            "Home internet connects the whole family at once without using anyone's data.",
-            'Frame the price: "Por {price} al mes, toda la familia tiene internet en casa y usted guarda sus datos '
-            'para cuando sale."',
-            "Close: ask for their name and phone number to reserve the install.",
+            'Agree with saving money, then ask ONE question and stop talking: "Tiene razón en cuidar su dinero. '
+            'Oiga, ¿sus datos le alcanzan todo el mes, o se le acaban antes?"',
+            'Ask the second question only after they answer: "¿Y cuántos en la casa se conectan a su celular?"',
+            'Build value from what they told you, one point, in their words. Data runs out: "Entonces a fin de mes '
+            'se queda sin datos justo cuando más los necesita, ¿verdad?" Family on it: "O sea que cuando los niños '
+            'ven videos, se están gastando SUS datos." Wait for their yes.',
+            'Paint the picture of the fix, still one point: "Con internet en la casa, los niños ven sus videos en la '
+            'tele y usted guarda sus datos para el trabajo o cuando sale." Wait for a reaction.',
+            'If they buy extra data or top-ups, ask how much: that money is part of what they already pay.',
+            'Then the price, as the fix: "Y todo eso por {price} al mes." Soft close: "Si le quita ese problema, '
+            '¿vale la pena probarlo?" Only then ask for their name and phone number.',
         ],
     },
     {
@@ -70,11 +72,29 @@ DOOR_TYPES: list[dict[str, object]] = [
     },
 ]
 
+# How value sticks: the customer hears their own problem in their own words, one point at a time.
+VALUE_RULES = [
+    "Ask before you tell. One question about their situation, then STOP and let them answer. Never answer your own "
+    "question or keep talking while they think.",
+    "Build value from their answer, in their words: \"Usted me dijo que...\", \"O sea que...\". A benefit they "
+    "didn't say they need doesn't stick.",
+    "One value point per turn, never a list. Three benefits in one breath sound like a sales pitch and none sticks.",
+    "Make it a picture they can see in their own house (the kids on the tablet while their data stays on their "
+    "phone), not a feature (speed, technology).",
+    "Check it landed: \"¿Le pasa eso?\", \"¿Verdad?\" Wait for the yes before the next point. Their yes is what "
+    "makes it stick.",
+    "Money in their terms: what they pay now (the bill, extra data, top-ups), and savings per year, not per month.",
+    "The price comes last, as the fix for what they told you, then a soft close: \"Si le quita ese problema, ¿vale "
+    "la pena probarlo?\"",
+    "After a soft no (\"no, está bien\"), ask ONE question and wait for the answer. Don't say goodbye in the same "
+    "breath; that's a goodbye, not a question.",
+]
+
 # The probing ladder seasoned reps use.
 LADDER = [
     "Acknowledge kindly first (\"Claro\", \"Le entiendo\", \"Con gusto\"). Never argue.",
     "Ask ONE easy question about their situation: do they have internet, with which company, how much they pay.",
-    "Connect their answer to a real benefit: saving phone data, a price that went up, the whole family connecting.",
+    "Wait for the answer. Then connect it to ONE real benefit, in their words, and check it landed.",
     "Give the offer using only your facts.",
     "Ask for a small next step: their name and phone number to reserve the install.",
 ]
@@ -114,9 +134,9 @@ BRUSH_OFFS: list[tuple[str, str, str]] = [
      "Me alegra. ¿Le han subido el precio desde que empezó?"),
     ("Solo uso el celular. / Uso hotspot.",
      "No home internet: a strong lead.",
-     "Le entiendo. Muchas veces los datos del celular se acaban rápido con los videos, se pone más lento y hay que conectarlo cada vez. "
-     "Con internet en casa, toda la familia se conecta sin gastar sus datos, y los guarda para el trabajo o cuando sale. "
-     "Y ahorita está muy económico: {price} al mes."),
+     "Le entiendo. ¿Sus datos le alcanzan todo el mes, o se le acaban antes? (Then wait, and build from their "
+     "answer: los datos del celular se acaban rápido con los videos; con internet en casa la familia se conecta sin "
+     "gastar sus datos, y usted los guarda para el trabajo.)"),
     ("Uso el WiFi del vecino. / De un familiar.",
      "Borrowed internet: slow and not private.",
      "Eso ayuda, pero cuando lo usan varios se pone lento y no es privado. Con el suyo, la señal es solo para su familia."),
@@ -171,6 +191,7 @@ def sales_skills_text(rep: str, company: str, price: str) -> str:
         f'- They say "{says}" ({means}) -> e.g. "{reply.format(**fill)}"' for says, means, reply in BRUSH_OFFS
     )
     stops = "\n".join(f"- {s}" for s in HARD_STOPS)
+    value = "\n".join(f"- {r}" for r in VALUE_RULES)
     types = "\n\n".join(
         f"{i}. {t['name']}\nSigns: {t['signs']}\n"
         + "\n".join(f"   - {str(step).format(**fill)}" for step in t["steps"])  # type: ignore[union-attr]
@@ -178,6 +199,9 @@ def sales_skills_text(rep: str, company: str, price: str) -> str:
     )
     return f"""# Sales skills (how a seasoned rep handles the door)
 Your goal is a sign-up, but the rep's time matters too: qualify fast and leave doors with no real need.
+
+## Building value so it sticks (every door)
+{value}
 
 ## The 4 door types you will meet most. Figure out which one you're at, then follow its steps.
 {types}

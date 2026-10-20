@@ -14,7 +14,7 @@ PB = Playbook.from_file(Path(__file__).resolve().parents[1] / "sample_playbook.j
 def test_instructions_include_brush_off_handling():
     text = PB.instructions(datetime(2026, 10, 19, 15, 0))
     assert "¿ya tiene internet en casa?" in text
-    assert "los datos del celular se acaban rápido" in text  # the hotspot answer
+    assert "los datos del celular se acaban rápido" in text  # the hotspot answer (built from their answer)
     assert "at most two friendly tries" in text
     assert "never pitch to anyone under 18" in text
 
@@ -48,3 +48,13 @@ def test_door_type_lines_never_contain_their_own_amounts():
     for t in DOOR_TYPES:
         for step in t["steps"]:
             assert amounts_in_text(str(step).replace("{price}", "")) == []
+
+
+def test_value_is_built_from_their_answer_one_point_at_a_time():
+    text = sales_skills_text(rep="Max", company="", price="$35")
+    assert "## Building value so it sticks" in text
+    assert "One value point per turn, never a list" in text
+    assert "¿sus datos le alcanzan todo el mes, o se le acaban antes?" in text
+    assert "Don't say goodbye in the same breath" in text
+    # value rules come before the door types, so they apply at every door
+    assert text.index("Building value so it sticks") < text.index("The 4 door types")
