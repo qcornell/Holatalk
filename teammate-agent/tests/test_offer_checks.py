@@ -205,3 +205,8 @@ def test_ana_switches_to_english_when_the_rep_asks():
     assert "If Max asks you to speak English" in text and "switch right away" in text
     assert "Max, they'd like English. Do you want to take it, or should I keep going in English?" in text
     assert "Always answer the customer in Spanish" not in text
+
+
+def test_ana_asks_the_rep_instead_of_listing_what_she_doesnt_know():
+    text = PB.instructions(NOW)
+    assert "Don't list\nwhat you don't know, don't ask the customer whether you should check" in text
