@@ -38,8 +38,9 @@ DOOR_TYPES: list[dict[str, object]] = [
             'Paint the picture of the fix, still one point: "Con internet en la casa, los niños ven sus videos en la '
             'tele y usted guarda sus datos para el trabajo o cuando sale." Wait for a reaction.',
             'If they buy extra data or top-ups, ask how much: that money is part of what they already pay.',
-            'Then the price, as the fix: "Y todo eso por {price} al mes." Soft close: "Si le quita ese problema, '
-            '¿vale la pena probarlo?" Only then ask for their name and phone number.',
+            'Then the price, as the fix: "Y todo eso por {price} al mes." Then go straight to the assumed close '
+            '(see "Closing" above): "Entonces, si le interesa, nomás ocupamos un buen nombre, número y correo, y se lo '
+            'dejamos listo."',
         ],
     },
     {
@@ -84,10 +85,25 @@ VALUE_RULES = [
     "Check it landed: \"¿Le pasa eso?\", \"¿Verdad?\" Wait for the yes before the next point. Their yes is what "
     "makes it stick.",
     "Money in their terms: what they pay now (the bill, extra data, top-ups), and savings per year, not per month.",
-    "The price comes last, as the fix for what they told you, then a soft close: \"Si le quita ese problema, ¿vale "
-    "la pena probarlo?\"",
+    "The price comes last, as the fix for what they told you. Then close (below): don't ask whether they want it.",
     "After a soft no (\"no, está bien\"), ask ONE question and wait for the answer. Don't say goodbye in the same "
     "breath; that's a goodbye, not a question.",
+]
+
+# Max's close: once the value lands, assume it. Never ask "do you want it?"
+CLOSING = [
+    "When they agree with the value, or just nod or go quiet, that's your moment: go straight to the assumed close.",
+    "Never ask if they want it: no \"¿le interesa?\", \"¿vale la pena probarlo?\", \"¿quiere apartarlo?\", \"would "
+    "you like to reserve it?\". Asking hands them an easy no.",
+    "Close like Max does, warm and sure, and move right into the details:",
+    "  - \"Entonces, si le interesa, nomás ocupamos un buen nombre, número y correo, y se lo dejamos listo.\"",
+    "  - \"Si le interesa, se lo podemos dejar listo hoy mismo. ¡Le va a encantar!\"",
+    "  - \"Va a estar mucho más rápido en su tele y en todos sus aparatos. ¿Cuál es su nombre completo?\"",
+    "  In English mode: \"So if you're interested, we just need a good name, number and email and we'll get it set "
+    "up for you.\" / \"We can get it set up for you today, you'll love it!\" / \"It'll be so much faster on your TV and "
+    "devices. What's your full name?\"",
+    "Right after the close line, ask for the first detail (their full name) and keep going: number, then email.",
+    "If they hesitate or raise a concern, handle it with the ladder, then close again the same way.",
 ]
 
 # The probing ladder seasoned reps use.
@@ -96,7 +112,7 @@ LADDER = [
     "Ask ONE easy question about their situation: do they have internet, with which company, how much they pay.",
     "Wait for the answer. Then connect it to ONE real benefit, in their words, and check it landed.",
     "Give the offer using only your facts.",
-    "Ask for a small next step: their name and phone number to reserve the install.",
+    "Assume the close (see Closing): go straight to getting their name, number and email.",
 ]
 
 PROBE_QUESTIONS = [
@@ -192,6 +208,7 @@ def sales_skills_text(rep: str, company: str, price: str) -> str:
     )
     stops = "\n".join(f"- {s}" for s in HARD_STOPS)
     value = "\n".join(f"- {r}" for r in VALUE_RULES)
+    closing = "\n".join(r if r.startswith("  ") else f"- {r}" for r in CLOSING)
     types = "\n\n".join(
         f"{i}. {t['name']}\nSigns: {t['signs']}\n"
         + "\n".join(f"   - {str(step).format(**fill)}" for step in t["steps"])  # type: ignore[union-attr]
@@ -202,6 +219,9 @@ Your goal is a sign-up, but the rep's time matters too: qualify fast and leave d
 
 ## Building value so it sticks (every door)
 {value}
+
+## Closing (Max's way)
+{closing}
 
 ## The 4 door types you will meet most. Figure out which one you're at, then follow its steps.
 {types}

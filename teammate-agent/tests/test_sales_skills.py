@@ -58,3 +58,13 @@ def test_value_is_built_from_their_answer_one_point_at_a_time():
     assert "Don't say goodbye in the same breath" in text
     # value rules come before the door types, so they apply at every door
     assert text.index("Building value so it sticks") < text.index("The 4 door types")
+
+
+def test_ana_assumes_the_close_like_max():
+    text = sales_skills_text(rep="Max", company="", price="$35")
+    assert "## Closing (Max's way)" in text
+    assert "nomás ocupamos un buen nombre, número y correo, y se lo dejamos listo" in text
+    assert "Never ask if they want it" in text
+    assert text.count("vale la pena") == 1  # only in the never-ask list
+    close = text.split("## Closing (Max's way)")[1].split("## The 4 door types")[0]
+    assert "So if you're interested, we just need a good name, number and email" in close
