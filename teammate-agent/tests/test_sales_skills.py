@@ -25,7 +25,7 @@ def test_price_is_filled_from_the_playbook():
 
 
 def test_no_price_means_no_number_is_invented():
-    text = sales_skills_text(rep="Max", company="", price="el precio")
+    text = sales_skills_text(rep="Quentin", company="", price="el precio")
     assert amounts_in_text(text) == []
 
 
@@ -51,7 +51,7 @@ def test_door_type_lines_never_contain_their_own_amounts():
 
 
 def test_value_is_built_from_their_answer_one_point_at_a_time():
-    text = sales_skills_text(rep="Max", company="", price="$35")
+    text = sales_skills_text(rep="Quentin", company="", price="$35")
     assert "## Building value so it sticks" in text
     assert "One value point per turn, never a list" in text
     assert "¿sus datos le alcanzan todo el mes, o se le acaban antes?" in text
@@ -61,10 +61,10 @@ def test_value_is_built_from_their_answer_one_point_at_a_time():
 
 
 def test_ana_assumes_the_close_like_max():
-    text = sales_skills_text(rep="Max", company="", price="$35")
-    assert "## Closing (Max's way)" in text
+    text = sales_skills_text(rep="Quentin", company="", price="$35")
+    assert "## Closing (assume it)" in text
     assert "nomás ocupamos un buen nombre, número y correo, y se lo dejamos listo" in text
     assert "Never ask if they want it" in text
     assert text.count("vale la pena") == 1  # only in the never-ask list
-    close = text.split("## Closing (Max's way)")[1].split("## The 4 door types")[0]
+    close = text.split("## Closing (assume it)")[1].split("## The 4 door types")[0]
     assert "So if you're interested, we just need a good name, number and email" in close

@@ -30,10 +30,10 @@ FACTS = PB.judge_facts(datetime(2026, 10, 19, 14, 12))
 
 PITCH = ("Ofrecemos internet aquí en el área por solo 35 dólares al mes con pago automático desde su cuenta de "
          "cheques. La instalación es gratis y no hay contrato.")
-PITCH2 = ("Le entiendo, pero yo debo hablar con usted en español. Si prefiere inglés, Max puede ayudar directamente."
+PITCH2 = ("Le entiendo, pero yo debo hablar con usted en español. Si prefiere inglés, Quentin puede ayudar directamente."
           "\n\nLa instalación es gratis y no hay contrato. Si le interesa, normalmente solo necesitamos su nombre, "
           "teléfono y correo para dejarlo listo. ¿Ya tiene una tele inteligente?")
-START = ["Ana: ¡Hola, buenas tardes! Soy Ana, la asistente virtual de Max. ¿Cómo está?",
+START = ["Ana: ¡Hola, buenas tardes! Soy Ana, la asistente virtual de Quentin. ¿Cómo está?",
          "Ana: Perfecto, le cuento rapidito la oferta y le hago una pregunta."]
 
 # (Ana may say it?, Ana's line, what came before)
@@ -43,7 +43,7 @@ CASES = [
     (True, "Usted paga $60 ahorita; con nosotros serían $35 al mes, se ahorra $25.", ["Customer: Pago 60 al mes con Spectrum."]),
     (True, "Son $35 al mes con pago automático de su cuenta de cheques, o $45 con tarjeta de débito.", []),
     (True, "La instalación es gratis y no hay contrato, así que no paga nada por instalar.", []),
-    (True, "Buena pregunta. Déjeme confirmarlo con Max.", ["Customer: ¿Hay depósito?"]),
+    (True, "Buena pregunta. Déjeme confirmarlo con Quentin.", ["Customer: ¿Hay depósito?"]),
     (True, "Perfecto, entonces con su cuenta de cheques le queda en $35 al mes.", ["Customer: Yo pago con mi cuenta de cheques."]),
     (False, "Sí, son $30 al mes.", ["Ana: Son $35 al mes.", "Customer: ¿No era $30 al mes?"]),
     (False, "No, no hay depósito.", ["Customer: ¿Hay depósito?"]),

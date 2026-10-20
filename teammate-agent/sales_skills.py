@@ -8,7 +8,7 @@ from the rep's facts.
 
 from __future__ import annotations
 
-# The 4 door types reps meet most (from Max, Oct 2026). Hola handles these first and best.
+# The 4 door types reps meet most (from Quentin, Oct 2026). Hola handles these first and best.
 DOOR_TYPES: list[dict[str, object]] = [
     {
         "name": "Happy with their internet and their price",
@@ -90,12 +90,12 @@ VALUE_RULES = [
     "breath; that's a goodbye, not a question.",
 ]
 
-# Max's close: once the value lands, assume it. Never ask "do you want it?"
+# The assumed close (how Quentin closes): once the value lands, assume it. Never ask "do you want it?"
 CLOSING = [
     "When they agree with the value, or just nod or go quiet, that's your moment: go straight to the assumed close.",
     "Never ask if they want it: no \"¿le interesa?\", \"¿vale la pena probarlo?\", \"¿quiere apartarlo?\", \"would "
     "you like to reserve it?\". Asking hands them an easy no.",
-    "Close like Max does, warm and sure, and move right into the details:",
+    "Close warm and sure, and move right into the details:",
     "  - \"Entonces, si le interesa, nomás ocupamos un buen nombre, número y correo, y se lo dejamos listo.\"",
     "  - \"Si le interesa, se lo podemos dejar listo hoy mismo. ¡Le va a encantar!\"",
     "  - \"Va a estar mucho más rápido en su tele y en todos sus aparatos. ¿Cuál es su nombre completo?\"",
@@ -220,7 +220,7 @@ Your goal is a sign-up, but the rep's time matters too: qualify fast and leave d
 ## Building value so it sticks (every door)
 {value}
 
-## Closing (Max's way)
+## Closing (assume it)
 {closing}
 
 ## The 4 door types you will meet most. Figure out which one you're at, then follow its steps.

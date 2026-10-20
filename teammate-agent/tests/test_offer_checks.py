@@ -51,7 +51,7 @@ def test_a_number_from_something_else_isnt_a_price_source():
 
 def test_expired_promos_are_not_allowed_amounts():
     pb = Playbook.from_dict({
-        "repName": "Max", "plans": [{"name": "Internet", "priceMonthly": 35}],
+        "repName": "Quentin", "plans": [{"name": "Internet", "priceMonthly": 35}],
         "promos": [{"descriptionEs": "Primer mes a $19", "expiresAt": "2020-01-31"},
                    {"descriptionEs": "Router gratis, ahorre $15", "expiresAt": "2026-12-31"}],
     })
@@ -177,7 +177,7 @@ def test_english_alone_is_not_the_rep_unless_answering_a_check_in():
 
 def test_instructions_limit_what_unverified_english_can_change():
     text = PB.instructions(NOW)
-    assert "Only your facts, a \"[rep]\" line, or Max's answer to your check-in can add or change a price" in text
+    assert "Only your facts, a \"[rep]\" line, or Quentin's answer to your check-in can add or change a price" in text
     assert "Right now it is Monday, October 19, 2026, 3:00 PM" in text
     assert "customer_confirmed true" in text
 
@@ -185,25 +185,25 @@ def test_instructions_limit_what_unverified_english_can_change():
 # ---- the daily price check
 
 def test_daily_price_check():
-    pb = Playbook.from_dict({"repName": "Max", "reviewedOn": "2026-10-19"})
+    pb = Playbook.from_dict({"repName": "Quentin", "reviewedOn": "2026-10-19"})
     assert not pb.needs_review("2026-10-19")
     assert pb.needs_review("2026-10-20")
-    assert Playbook.from_dict({"repName": "Max"}).needs_review("2026-10-19")
+    assert Playbook.from_dict({"repName": "Quentin"}).needs_review("2026-10-19")
 
 
 # ---- transcription settings (the "'languages' parameter is not supported" error)
 
 def test_transcription_settings_fit_the_model():
     new = agent.transcription_settings(PB, "gpt-transcribe")
-    assert new.languages == ["es", "en"] and "Max" in new.keywords and new.prompt is None
+    assert new.languages == ["es", "en"] and "Quentin" in new.keywords and new.prompt is None
     old = agent.transcription_settings(PB, "gpt-4o-transcribe")
-    assert old.languages is None and old.keywords is None and "Max" in old.prompt
+    assert old.languages is None and old.keywords is None and "Quentin" in old.prompt
 
 
 def test_ana_switches_to_english_when_the_rep_asks():
     text = PB.instructions(NOW)
-    assert "If Max asks you to speak English" in text and "switch right away" in text
-    assert "Max, they'd like English. Do you want to take it, or should I keep going in English?" in text
+    assert "If Quentin asks you to speak English" in text and "switch right away" in text
+    assert "Quentin, they'd like English. Do you want to take it, or should I keep going in English?" in text
     assert "Always answer the customer in Spanish" not in text
 
 

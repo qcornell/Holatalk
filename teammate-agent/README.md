@@ -37,10 +37,10 @@ Use headphones for this test, so Hola doesn't hear itself through your speakers.
    then speak English as the rep ("tell her install is Saturday"). Try a wrong price on purpose
    ("¿no era $30?") to see the price check work. Each sign-up you finish is added to `leads.jsonl`.
 6. Try the check-in: as the customer, say yes and give a name, number and email. Ana says
-   "Un momentito, déjeme hablar con Max" and asks you in English if there's anything else. Answer
+   "Un momentito, déjeme hablar con Quentin" and asks you in English if there's anything else. Answer
    as the rep, for example "ask if they have a Social Security number or a passport", "explain it's
    $35 with autopay from checking or $45 with debit", or "no, that's it, thank you". Stay quiet
-   once to hear her say "Max?" and then carry on.
+   once to hear her say "Quentin?" and then carry on.
 
 ## Compare gpt-realtime-2.1 and GPT-Live-1
 
@@ -111,8 +111,8 @@ Server logs show only message types, never names, numbers or what was said.
 
 Like a real interpreter, Ana steps aside and talks to you in English, then goes back to the customer:
 
-- After she saves the name, number and email: "Un momentito, déjeme hablar con Max." then
-  "Max, I've got their name, number and email. Anything else you want me to ask or explain?"
+- After she saves the name, number and email: "Un momentito, déjeme hablar con Quentin." then
+  "Quentin, I've got their name, number and email. Anything else you want me to ask or explain?"
 - When the customer asks something your playbook doesn't answer, she asks you the question out loud.
 - Your answer is for her, not a line to read out: "ask if they have an SSN or passport" makes her ask,
   then tell you the answer in English. "No, that's it" sends her back to the customer to wrap up.

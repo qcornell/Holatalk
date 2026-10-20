@@ -11,14 +11,14 @@ SAMPLE = Path(__file__).resolve().parents[1] / "sample_playbook.json"
 
 def test_sample_loads():
     pb = Playbook.from_file(SAMPLE)
-    assert pb.rep_name == "Max"
+    assert pb.rep_name == "Quentin"
     assert pb.find_plan("internet").price_monthly == 35
 
 
 def test_greeting_says_it_is_ai_and_fits_time_of_day():
     pb = Playbook.from_file(SAMPLE)
     assert pb.greeting(datetime(2026, 10, 19, 15, 0)) == (
-        "¡Hola, buenas tardes! Soy Ana, la asistente virtual de Max. ¿Cómo está?"
+        "¡Hola, buenas tardes! Soy Ana, la asistente virtual de Quentin. ¿Cómo está?"
     )
     assert "buenos días" in pb.greeting(datetime(2026, 10, 19, 11, 0))
 
@@ -41,7 +41,7 @@ def test_max_pitch_and_facts():
 
 def test_allowed_amounts_come_from_playbook():
     pb = Playbook.from_dict({
-        "repName": "Max",
+        "repName": "Quentin",
         "plans": [{"name": "Internet", "priceMonthly": 35}],
         "policies": {"installationFee": 0, "hasContract": False},
         "facts": {"Autopay and paying": {"Autopay discount": "$5 off each month"}},
@@ -52,7 +52,7 @@ def test_allowed_amounts_come_from_playbook():
 
 def test_expired_promos_are_left_out():
     pb = Playbook.from_dict({
-        "repName": "Max",
+        "repName": "Quentin",
         "promos": [
             {"descriptionEs": "Primer mes gratis", "expiresAt": "2026-10-01"},
             {"descriptionEs": "Instalación gratis", "expiresAt": "2026-12-31"},

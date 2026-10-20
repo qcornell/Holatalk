@@ -56,7 +56,7 @@ def test_amounts_the_rep_says_in_english_are_heard():
     assert amounts_in_text("thirty five dollars a month") == [35.0]
     assert amounts_in_text("a hundred and fifty dollars") == [150.0]
     assert amounts_in_text("two hundred dollars") == [200.0]
-    # a deposit Max says out loud becomes allowed for Ana to repeat
+    # a deposit Quentin says out loud becomes allowed for Ana to repeat
     heard = set(amounts_in_text("Tell her the deposit is fifty dollars", money_only=False))
     assert unexpected_amounts("El depósito es de $50", expand_allowed(PB.allowed_amounts(), heard)) == []
 
@@ -64,8 +64,8 @@ def test_amounts_the_rep_says_in_english_are_heard():
 # ---- the check-in
 
 def test_instructions_explain_the_check_in():
-    assert "# Checking in with Max" in TEXT
-    assert "Un momentito, déjeme hablar con Max." in TEXT
+    assert "# Checking in with Quentin" in TEXT
+    assert "Un momentito, déjeme hablar con Quentin." in TEXT
     assert "Anything else you" in TEXT and "\"No, that's it\"" in TEXT
     assert '"[rep]"' in TEXT
 
@@ -99,7 +99,7 @@ def test_save_lead_saves_first_then_checks_in_once():
         a, phone, store = make_agent()
         out = await a.save_lead(None, "María López", "(979) 555-0142", "maria@ejemplo.com", True,
                                 payment="debit card")
-        assert "Max, I've got their name, number and email" in out
+        assert "Quentin, I've got their name, number and email" in out
         assert [k for k, _ in phone.sent] == ["lead", "check_in"]
         assert phone.sent[0][1]["status"] == "saved"
         assert phone.sent[0][1]["fields"]["monthly"] == 45
@@ -172,7 +172,7 @@ def test_ask_rep_is_asked_out_loud_in_english():
         a = agent.TeammateAgent(PB, phone)
         a.wait_for_rep = lambda: None
         out = await a.ask_rep(None, "Is there a deposit?")
-        assert "Then ask Max in English" in out and "'Max, Is there a deposit?'" in out
+        assert "Then ask Quentin in English" in out and "'Quentin, Is there a deposit?'" in out
         assert phone.sent == [("ask_rep", {"question": "Is there a deposit?"})]
     asyncio.run(run())
 
@@ -192,9 +192,9 @@ def test_nudge_says_his_name_then_carries_on():
         phone = FakePhone()
         a = QuietAgent(PB, phone)
         await a._nudge_rep(asked_at=agent.time.monotonic())
-        assert said[0].endswith("'Max?'") and "carry on" in said[1]
+        assert said[0].endswith("'Quentin?'") and "carry on" in said[1]
         assert phone.sent == [("rep_nudge", {})]
-        # once Max answers, Ana stops nudging
+        # once Quentin answers, Ana stops nudging
         said.clear()
         asked = agent.time.monotonic()
         a.heard_rep()
