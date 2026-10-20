@@ -12,6 +12,7 @@ import { AndroidAudioTypePresets, AudioSession } from '@livekit/react-native';
 import { Participant, RemoteParticipant, Room, RoomEvent, TokenSource } from 'livekit-client';
 import type { TeammateSettings } from './settings';
 import { toPlaybook } from './settings';
+import { AccountError, startCall, usingTestConnection } from '../main/account';
 
 const TOPIC = 'hola';
 const AGENT_NAME = 'hola-teammate';
@@ -68,6 +69,10 @@ export interface CallState {
   moveOn: string;
   endedReason: string;
   costUsd: number | null;
+  /** Why the call couldn't start, from the Hola server: out_of_minutes, no_plan, offline, ... */
+  errorCode: string;
+  /** The plan ran out mid-call: Ana wraps up after this many seconds */
+  minutesOut: number | null;
 }
 
 const START: CallState = {
@@ -85,6 +90,8 @@ const START: CallState = {
   moveOn: '',
   endedReason: '',
   costUsd: null,
+  errorCode: '',
+  minutesOut: null,
 };
 
 /** A strong buzz so you feel it in your hand or pocket. */
@@ -92,32 +99,27 @@ function buzz(times = 2) {
   Vibration.vibrate(times > 1 ? [0, 400, 150, 400] : 400);
 }
 
+/**
+ * How the phone gets into a room with Ana: the Hola server (checks the plan and minutes), or, while
+ * testing, LiveKit's development token server when its ID is set in Settings > Connection.
+ */
 async function connectionFor(s: TeammateSettings, roomName: string): Promise<{ serverUrl: string; participantToken: string }> {
   const identity = `rep-${s.deviceId}`;
   const userId = `device-${s.deviceId}`;
-  const { startUrl, accessCode, tokenServerId } = s.connection;
-  if (startUrl.trim()) {
-    const r = await fetch(startUrl.trim(), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ access_code: accessCode, device_id: s.deviceId }),
-    });
-    const data = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(data.message || data.error || `Couldn't start the call (HTTP ${r.status}).`);
-    return { serverUrl: data.serverUrl, participantToken: data.participantToken };
+  const { tokenServerId } = s.connection;
+  if (!tokenServerId.trim()) {
+    const ticket = await startCall(s);
+    return { serverUrl: ticket.serverUrl, participantToken: ticket.participantToken };
   }
-  if (tokenServerId.trim()) {
-    const source = TokenSource.developmentTokenServer(tokenServerId.trim());
-    const got = await source.fetch({
-      roomName,
-      participantIdentity: identity,
-      participantName: s.repName || 'Rep',
-      agentName: AGENT_NAME,
-      agentMetadata: JSON.stringify({ user_id: userId, rep_identity: identity }),
-    });
-    return { serverUrl: got.serverUrl, participantToken: got.participantToken };
-  }
-  throw new Error('Add your LiveKit token server ID in Teammate setup, under Connection.');
+  const source = TokenSource.developmentTokenServer(tokenServerId.trim());
+  const got = await source.fetch({
+    roomName,
+    participantIdentity: identity,
+    participantName: s.repName || 'Rep',
+    agentName: AGENT_NAME,
+    agentMetadata: JSON.stringify({ user_id: userId, rep_identity: identity }),
+  });
+  return { serverUrl: got.serverUrl, participantToken: got.participantToken };
 }
 
 export function useTeammateCall(settings: TeammateSettings) {
@@ -186,6 +188,10 @@ export function useTeammateCall(settings: TeammateSettings) {
           break;
         case 'move_on':
           patch({ moveOn: String(msg.reason ?? '') });
+          break;
+        case 'minutes_out': // the plan ran out; Ana wraps up after a short grace
+          buzz(1);
+          patch({ minutesOut: typeof msg.grace_seconds === 'number' ? msg.grace_seconds : 180 });
           break;
         case 'ended':
           patch({ endedReason: String(msg.reason ?? ''), costUsd: typeof msg.cost_usd === 'number' ? msg.cost_usd : null });
@@ -266,14 +272,19 @@ export function useTeammateCall(settings: TeammateSettings) {
           ended.current = true;
           r.disconnect();
           AudioSession.stopAudioSession().catch(() => {});
-          patch({ phase: 'error', error: "Ana didn't pick up. Is start-ana-for-iphone running on your PC?" });
+          patch({
+            phase: 'error',
+            error: usingTestConnection(s)
+              ? "Ana didn't pick up. Is start-ana-for-iphone running on your PC?"
+              : "Ana didn't pick up. Try again in a moment.",
+          });
         }, ANA_JOIN_SECONDS * 1000);
       } catch (e: any) {
         if (cancelled) return;
         ended.current = true;
         r.disconnect();
         AudioSession.stopAudioSession().catch(() => {});
-        patch({ phase: 'error', error: e?.message || String(e) });
+        patch({ phase: 'error', error: e?.message || String(e), errorCode: e instanceof AccountError ? e.code : '' });
       }
     })();
 

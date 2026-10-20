@@ -327,7 +327,17 @@ function Row({ label, value, done }: { label: string; value: string; done?: bool
 }
 
 /* ── after the call ── */
-function Ended({ state, settings, onNext }: { state: CallState; settings: TeammateSettings; onNext: (r: CallResult) => void }) {
+function Ended({
+  state,
+  settings,
+  onNext,
+  onPlans,
+}: {
+  state: CallState;
+  settings: TeammateSettings;
+  onNext: (r: CallResult) => void;
+  onPlans?: () => void;
+}) {
   const pop = useRef(new Animated.Value(0.6)).current;
   useEffect(() => {
     Animated.spring(pop, { toValue: 1, friction: 5, useNativeDriver: true }).start();
@@ -341,7 +351,13 @@ function Ended({ state, settings, onNext }: { state: CallState; settings: Teamma
       </Animated.View>
       <Text style={st.endedTitle}>{won ? 'Signed up!' : 'Call ended'}</Text>
       <Text style={st.endedSub}>
-        {won ? `Nice close, ${settings.repName || 'champ'}.` : state.moveOn ? `Ana: ${state.moveOn}` : 'On to the next one.'}
+        {won
+          ? `Nice close, ${settings.repName || 'champ'}.`
+          : state.endedReason === 'out_of_minutes'
+            ? "You're out of minutes for now."
+            : state.moveOn
+              ? `Ana: ${state.moveOn}`
+              : 'On to the next one.'}
       </Text>
       {won && state.signup ? (
         <View style={st.endedCard}>
@@ -366,6 +382,18 @@ function Ended({ state, settings, onNext }: { state: CallState; settings: Teamma
         <Text style={st.nextText}>Next door</Text>
         <ChevronRightIcon />
       </Pressable>
+      {state.endedReason === 'out_of_minutes' && onPlans ? (
+        <Pressable
+          onPress={() => {
+            onNext({ signedUp: won, seconds: state.seconds });
+            onPlans();
+          }}
+          accessibilityRole="button"
+          style={st.secondaryBtn}
+        >
+          <Text style={st.secondaryText}>Get more minutes</Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -374,10 +402,13 @@ export default function TeammateCallScreen({
   settings,
   onDone,
   onRetry,
+  onPlans,
 }: {
   settings: TeammateSettings;
   onDone: (r?: CallResult) => void;
   onRetry: () => void;
+  /** Open the plans (out of minutes, or no plan yet) */
+  onPlans?: () => void;
 }) {
   useKeepAwake();
   const call = useTeammateCall(settings);
@@ -415,22 +446,29 @@ export default function TeammateCallScreen({
     return (
       <SafeAreaView style={st.root}>
         <StatusBar barStyle="light-content" />
-        <Ended state={state} settings={settings} onNext={onDone} />
+        <Ended state={state} settings={settings} onNext={onDone} onPlans={onPlans} />
       </SafeAreaView>
     );
   }
 
+  const needsPlan = state.errorCode === 'out_of_minutes' || state.errorCode === 'no_plan';
   if (state.phase === 'error') {
     return (
       <SafeAreaView style={st.root}>
         <StatusBar barStyle="light-content" />
         <View style={st.endedWrap}>
-          <Text style={st.endedTitle}>Couldn't reach Ana</Text>
+          <Text style={st.endedTitle}>{needsPlan ? (state.errorCode === 'out_of_minutes' ? 'Out of minutes' : 'No plan yet') : "Couldn't reach Ana"}</Text>
           <Text style={[st.endedSub, { textAlign: 'center' }]}>{state.error}</Text>
           <View style={{ flex: 1 }} />
-          <Pressable onPress={onRetry} style={({ pressed }) => [st.nextBtn, pressed && { opacity: 0.85 }]}>
-            <Text style={st.nextText}>Try again</Text>
-          </Pressable>
+          {needsPlan && onPlans ? (
+            <Pressable onPress={onPlans} accessibilityRole="button" style={({ pressed }) => [st.nextBtn, pressed && { opacity: 0.85 }]}>
+              <Text style={st.nextText}>See plans</Text>
+            </Pressable>
+          ) : (
+            <Pressable onPress={onRetry} accessibilityRole="button" style={({ pressed }) => [st.nextBtn, pressed && { opacity: 0.85 }]}>
+              <Text style={st.nextText}>Try again</Text>
+            </Pressable>
+          )}
           <Pressable onPress={() => onDone()} style={st.secondaryBtn}>
             <Text style={st.secondaryText}>Back</Text>
           </Pressable>
@@ -482,6 +520,11 @@ export default function TeammateCallScreen({
 
       <View style={{ flex: 1 }} />
 
+      {state.minutesOut != null ? (
+        <View style={st.outPill} accessibilityLiveRegion="polite">
+          <Text style={st.outText}>Your minutes ran out. Ana wraps up in {Math.max(1, Math.round(state.minutesOut / 60))} min.</Text>
+        </View>
+      ) : null}
       <View style={st.ctrlRow}>
         <CallButton label="Silenciar" on={state.muted} onPress={call.toggleMute}>
           <MicIcon off={state.muted} color={state.muted ? '#050507' : '#FFFFFF'} />
@@ -598,6 +641,8 @@ const st = StyleSheet.create({
   endOutline: { height: 50, borderRadius: 25, borderWidth: 1.5, borderColor: '#E5484D', alignItems: 'center', justifyContent: 'center', marginTop: 8 },
   endOutlineText: { color: '#C4262E', fontSize: 16, fontWeight: '600' },
 
+  outPill: { alignSelf: 'center', marginHorizontal: 24, marginBottom: 14, paddingVertical: 8, paddingHorizontal: 14, borderRadius: 16, backgroundColor: '#3A2A0A' },
+  outText: { fontSize: 14, fontWeight: '600', color: '#F5C26B', textAlign: 'center' },
   endedWrap: { flex: 1, alignItems: 'center', paddingTop: 84, paddingHorizontal: 22, paddingBottom: 30 },
   endedBadge: { width: 128, height: 128, borderRadius: 64, backgroundColor: ACCENT, alignItems: 'center', justifyContent: 'center' },
   endedTitle: { marginTop: 22, fontSize: 34, fontWeight: '800', color: '#FFFFFF', letterSpacing: -0.6 },

@@ -11,7 +11,6 @@ import { C, Card, DarkHeader, GroupLabel, Row, Sheet } from './ui';
 
 export const TERMS_URL = 'https://sites.google.com/view/holad2dtranslator/terms';
 export const PRIVACY_URL = 'https://sites.google.com/view/holad2dtranslator/home';
-const MANAGE_SUBSCRIPTIONS = 'https://apps.apple.com/account/subscriptions';
 
 export interface EditTarget {
   title: string;
@@ -22,10 +21,15 @@ export default function SettingsScreen({
   settings,
   onBack,
   onEdit,
+  onPlans,
+  planName,
 }: {
   settings: TeammateSettings;
   onBack: () => void;
   onEdit: (t: EditTarget) => void;
+  onPlans: () => void;
+  /** The rep's plan, when known */
+  planName?: string;
 }) {
   const pack = industry(settings.industry);
   const facts = factsAnswered(settings);
@@ -94,7 +98,7 @@ export default function SettingsScreen({
 
           <GroupLabel>Account</GroupLabel>
           <Card style={st.group}>
-            <Row icon={<CardIcon size={20} color={muted} />} label="Subscription" value="Manage" onPress={() => Linking.openURL(MANAGE_SUBSCRIPTIONS)} />
+            <Row icon={<CardIcon size={20} color={muted} />} label="Your plan" value={planName || 'See plans'} onPress={onPlans} />
             <Row
               icon={<LinkIcon size={20} color={muted} />}
               label="Connection (testing)"

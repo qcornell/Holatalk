@@ -39,3 +39,12 @@ def test_nothing_priced_means_no_price_card():
     church = Playbook.from_dict({"repName": "Quentin", "industry": "ministry", "plans": []})
     names = sorted(t.info.name for t in agent.TeammateAgent(church, agent.PhoneBridge(ctx=None)).tools)
     assert names == ["ask_rep", "move_on", "ready_to_sign_up", "schedule_callback"]
+
+
+def test_plan_minutes_cap_the_call_with_a_short_grace():
+    cap = agent.MAX_MINUTES * 60
+    assert agent.call_seconds({}) == (cap, None)  # no plan limit (testing, owner)
+    assert agent.call_seconds({"seconds_left": 10 * 60}) == (10 * 60 + agent.OUT_OF_MINUTES_GRACE, 600.0)
+    assert agent.call_seconds({"seconds_left": cap + 5}) == (cap, None)  # plenty left: the usual cap
+    assert agent.call_seconds({"seconds_left": 0}) == (agent.OUT_OF_MINUTES_GRACE, 0.0)
+    assert agent.call_seconds({"seconds_left": "junk"}) == (cap, None)

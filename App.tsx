@@ -21,13 +21,15 @@ import HomeScreen from './src/main/HomeScreen';
 import SettingsScreen from './src/main/SettingsScreen';
 import type { EditTarget } from './src/main/SettingsScreen';
 import { loadToday, recordCall } from './src/main/stats';
+import { AccountError, planStatus, usingTestConnection } from './src/main/account';
+import type { PlanStatus } from './src/main/account';
 import type { DayStats } from './src/main/stats';
 import { C } from './src/main/ui';
 import PaywallScreen from './src/screens/PaywallScreen';
 import ConvoScreen from './src/screens/ConvoScreen';
 import TeachMeScreen from './src/screens/TeachMeScreen';
 
-type Screen = 'home' | 'call' | 'convo' | 'teach' | 'settings' | 'edit';
+type Screen = 'home' | 'call' | 'convo' | 'teach' | 'settings' | 'edit' | 'plans';
 
 export default function App() {
   const [booting, setBooting] = useState(true);
@@ -38,6 +40,8 @@ export default function App() {
   const [stats, setStats] = useState<DayStats | null>(null);
   const [screen, setScreen] = useState<Screen>('home');
   const [edit, setEdit] = useState<EditTarget | null>(null);
+  const [plan, setPlan] = useState<PlanStatus | null>(null);
+  const [planNote, setPlanNote] = useState('');
 
   useEffect(() => {
     (async () => {
@@ -66,6 +70,32 @@ export default function App() {
     return () => sub.remove();
   }, []);
 
+  // minutes left on the plan, from the Hola server
+  const refreshPlan = useCallback(async (s: TeammateSettings | null) => {
+    if (!s) return;
+    if (usingTestConnection(s)) {
+      setPlan(null);
+      setPlanNote('Testing connection: minutes not counted');
+      return;
+    }
+    try {
+      setPlan(await planStatus(s));
+      setPlanNote('');
+    } catch (e) {
+      if (e instanceof AccountError && e.status) {
+        setPlan(e.status); // out of minutes still tells us the plan
+        setPlanNote('');
+      } else {
+        setPlan(null);
+        setPlanNote(e instanceof AccountError && e.code === 'no_plan' ? 'No Hola plan found on this Apple ID' : "Couldn't check your minutes");
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    if (subscribed === true && screen === 'home') refreshPlan(settings);
+  }, [subscribed, screen, settings, refreshPlan]);
+
   const save = useCallback(async (next: TeammateSettings) => {
     await saveTeammateSettings(next);
     setSettings(next);
@@ -89,7 +119,17 @@ export default function App() {
         <PaywallScreen assistantName={settings.assistantName} onSubscribed={() => setSubscribed(true)} />
       );
   } else if (screen === 'call') {
-    body = <TeammateFlow settings={settings} onSave={save} onExit={callDone} />;
+    body = <TeammateFlow settings={settings} onSave={save} onExit={callDone} onPlans={() => setScreen('plans')} />;
+  } else if (screen === 'plans') {
+    body = (
+      <PaywallScreen
+        mode="change"
+        currentPlan={plan?.trial ? undefined : plan?.plan}
+        assistantName={settings.assistantName}
+        onBack={() => setScreen('home')}
+        onSubscribed={() => setScreen('home')}
+      />
+    );
   } else if (screen === 'convo') {
     body = <ConvoScreen repName={settings.repName} industryId={settings.industry} repProfile={profile} onBack={() => setScreen('home')} />;
   } else if (screen === 'teach') {
@@ -121,6 +161,8 @@ export default function App() {
       <SettingsScreen
         settings={settings}
         onBack={() => setScreen('home')}
+        planName={plan ? (plan.trial ? 'Free week' : plan.plan) : undefined}
+        onPlans={() => setScreen('plans')}
         onEdit={(t) => {
           setEdit(t);
           setScreen('edit');
@@ -132,6 +174,9 @@ export default function App() {
       <HomeScreen
         settings={settings}
         stats={stats}
+        plan={plan}
+        planNote={planNote}
+        onPlans={() => setScreen('plans')}
         onCall={() => setScreen('call')}
         onConvo={() => setScreen('convo')}
         onTeachMe={() => setScreen('teach')}

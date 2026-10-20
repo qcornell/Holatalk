@@ -13,17 +13,35 @@ import {
   finishTransaction,
   purchaseUpdatedListener,
   purchaseErrorListener,
+  deepLinkToSubscriptions,
 } from 'expo-iap';
-import type { Product, Purchase } from 'expo-iap';
+import type { Purchase } from 'expo-iap';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Platform } from 'react-native';
-import { PRODUCT_ID, SUB_CACHE_KEY, SUB_CACHE_EXPIRY_KEY, CACHE_DURATION_MS } from './config';
+import { Linking } from 'react-native';
+import {
+  ALL_SUBSCRIPTION_IDS,
+  LEGACY_PLAN,
+  PLANS,
+  PRODUCT_ID,
+  SUB_CACHE_KEY,
+  SUB_CACHE_EXPIRY_KEY,
+  CACHE_DURATION_MS,
+} from './config';
+import type { PlanInfo } from './config';
 
 export interface SubscriptionProduct {
   title: string;
   description: string;
   price: string;
   productId: string;
+}
+
+/** A plan as the App Store sells it: our name and minutes, Apple's price. */
+export interface PlanProduct extends PlanInfo {
+  /** Localized price from the App Store, e.g. "$19.99" */
+  price: string;
+  /** The plan has a free-trial introductory offer */
+  freeTrial: boolean;
 }
 
 let connected = false;
@@ -47,7 +65,7 @@ export async function connectStore(
     purchaseUpdateSub = purchaseUpdatedListener(async (purchase: Purchase) => {
       console.log('[Store] Purchase update:', purchase.productId, purchase.purchaseState);
       
-      if (purchase.purchaseState === 'purchased') {
+      if (purchase.purchaseState === 'purchased' && ALL_SUBSCRIPTION_IDS.includes(purchase.productId)) {
         // Finish the transaction
         try {
           await finishTransaction({ purchase, isConsumable: false });
@@ -124,7 +142,72 @@ export async function getProduct(): Promise<SubscriptionProduct | null> {
 }
 
 /**
- * Initiate a purchase
+ * The plans for sale, cheapest first, with App Store prices. Until the plans exist in App Store
+ * Connect this falls back to the first subscription, so the paywall always has something to sell.
+ */
+export async function getPlans(): Promise<PlanProduct[]> {
+  try {
+    if (!connected) {
+      await initConnection();
+      connected = true;
+    }
+    const products = ((await fetchProducts({ skus: ALL_SUBSCRIPTION_IDS, type: 'subs' })) ?? []) as any[];
+    const byId = new Map(products.map((p) => [p.id, p]));
+    const toPlan = (info: PlanInfo): PlanProduct | null => {
+      const p = byId.get(info.id);
+      if (!p) return null;
+      const trial = p.introductoryPricePaymentModeIOS === 'free-trial' || p.subscriptionInfoIOS?.introductoryOffer?.paymentMode === 'free-trial';
+      return { ...info, price: p.displayPrice, freeTrial: !!trial };
+    };
+    const plans = PLANS.map(toPlan).filter((p): p is PlanProduct => !!p);
+    if (plans.length) return plans;
+    const legacy = toPlan(LEGACY_PLAN);
+    return legacy ? [legacy] : [];
+  } catch (e: any) {
+    console.warn('[Store] getPlans failed:', e?.message);
+    return [];
+  }
+}
+
+/** Buy a plan, or switch to it (Apple handles upgrades and downgrades within the plans). */
+export async function purchasePlan(productId: string): Promise<void> {
+  await requestPurchase({
+    request: { apple: { sku: productId }, google: { skus: [productId] } },
+    type: 'subs',
+  });
+}
+
+/**
+ * The rep's live subscriptions as Apple-signed transactions (JWS), for the Hola server to check.
+ * Empty when there are none or the store can't be reached.
+ */
+export async function planTransactions(): Promise<string[]> {
+  try {
+    if (!connected) {
+      await initConnection();
+      connected = true;
+    }
+    const purchases = ((await getAvailablePurchases()) ?? []) as Purchase[];
+    return purchases
+      .filter((p) => ALL_SUBSCRIPTION_IDS.includes(p.productId) && typeof p.purchaseToken === 'string' && p.purchaseToken.length > 0)
+      .map((p) => p.purchaseToken as string);
+  } catch (e: any) {
+    console.warn('[Store] planTransactions failed:', e?.message);
+    return [];
+  }
+}
+
+/** Apple's own screen to change or cancel the plan. */
+export async function manageSubscription(): Promise<void> {
+  try {
+    await deepLinkToSubscriptions();
+  } catch {
+    await Linking.openURL('https://apps.apple.com/account/subscriptions');
+  }
+}
+
+/**
+ * Initiate a purchase of the first subscription (kept for older callers)
  */
 export async function purchaseSubscription(): Promise<void> {
   try {
@@ -152,7 +235,7 @@ export async function restorePurchases(): Promise<boolean> {
       connected = true;
     }
 
-    const hasActive = await hasActiveSubscriptions([PRODUCT_ID]);
+    const hasActive = await hasActiveSubscriptions(ALL_SUBSCRIPTION_IDS);
     
     if (hasActive) {
       await cacheSubscriptionStatus(true);
@@ -164,7 +247,7 @@ export async function restorePurchases(): Promise<boolean> {
     
     if (purchases && purchases.length > 0) {
       for (const purchase of purchases) {
-        if (purchase.productId === PRODUCT_ID && purchase.purchaseState === 'purchased') {
+        if (ALL_SUBSCRIPTION_IDS.includes(purchase.productId) && purchase.purchaseState === 'purchased') {
           try {
             await finishTransaction({ purchase, isConsumable: false });
           } catch (e) {

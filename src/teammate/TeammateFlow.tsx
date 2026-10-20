@@ -70,12 +70,15 @@ export default function TeammateFlow({
   settings,
   onSave,
   onExit,
+  onPlans,
 }: {
   settings: TeammateSettings;
   /** Saves the setup (the daily check stamps today's date) */
   onSave: (s: TeammateSettings) => Promise<void>;
   /** Back home; with how the call went when there was one */
   onExit: (result?: CallResult) => void;
+  /** Out of minutes or no plan: go to the plans */
+  onPlans: () => void;
 }) {
   const [step, setStep] = useState<Step>(() => (needsDailyCheck(settings) ? 'check' : 'call'));
   const [callKey, setCallKey] = useState(0);
@@ -100,7 +103,9 @@ export default function TeammateFlow({
       />
     );
   }
-  return <TeammateCallScreen key={callKey} settings={settings} onDone={(r) => onExit(r)} onRetry={() => setCallKey((k) => k + 1)} />;
+  return (
+    <TeammateCallScreen key={callKey} settings={settings} onDone={(r) => onExit(r)} onRetry={() => setCallKey((k) => k + 1)} onPlans={onPlans} />
+  );
 }
 
 const st = StyleSheet.create({

@@ -7,6 +7,8 @@ import { needsDailyCheck, priceChips } from '../teammate/settings';
 import { industry } from '../teammate/industries';
 import { ChatIcon, ChevronIcon, GearIcon, PersonIcon, PhoneIcon } from '../teammate/icons';
 import type { DayStats } from './stats';
+import type { PlanStatus } from './account';
+import { resetsOn } from './account';
 import { C } from './ui';
 
 const ANA = require('../../assets/teammate/ana.png');
@@ -18,9 +20,17 @@ export default function HomeScreen({
   onConvo,
   onTeachMe,
   onSettings,
+  plan,
+  planNote,
+  onPlans,
 }: {
   settings: TeammateSettings;
   stats: DayStats;
+  /** Minutes left on the rep's plan (null while loading or when it couldn't be checked) */
+  plan: PlanStatus | null;
+  /** Shown instead of the minutes when there's no plan status: "Testing connection", an error */
+  planNote: string;
+  onPlans: () => void;
   onCall: () => void;
   onConvo: () => void;
   onTeachMe: () => void;
@@ -69,6 +79,35 @@ export default function HomeScreen({
                 </View>
               </View>
             </View>
+            {plan ? (
+              <View style={st.minutes}>
+                <View style={st.minutesRow}>
+                  <Text style={[st.minutesText, plan.minutesLeft === 0 && { color: '#F5C26B' }]}>
+                    {plan.minutesLeft === 0 ? 'Out of minutes' : `${plan.minutesLeft} of ${plan.minutesInPlan} min left`}
+                  </Text>
+                  <Text style={st.minutesMeta}>
+                    {plan.trial ? 'Free week' : plan.plan}
+                    {resetsOn(plan.periodEnd) && !plan.trial ? ` · ${resetsOn(plan.periodEnd)}` : ''}
+                  </Text>
+                </View>
+                <View style={st.bar} accessibilityElementsHidden>
+                  <View
+                    style={[
+                      st.barFill,
+                      { width: `${Math.max(0, Math.min(100, (plan.minutesLeft / Math.max(1, plan.minutesInPlan)) * 100))}%` },
+                      plan.minutesLeft / Math.max(1, plan.minutesInPlan) < 0.15 && { backgroundColor: '#F5A524' },
+                    ]}
+                  />
+                </View>
+                {plan.minutesLeft / Math.max(1, plan.minutesInPlan) < 0.15 ? (
+                  <Pressable onPress={onPlans} accessibilityRole="button" hitSlop={6} style={st.morePill}>
+                    <Text style={st.moreText}>{plan.minutesLeft === 0 ? 'Get more minutes' : 'Running low. See plans'}</Text>
+                  </Pressable>
+                ) : null}
+              </View>
+            ) : planNote ? (
+              <Text style={st.planNote}>{planNote}</Text>
+            ) : null}
             {chips.length ? (
               <View style={st.chips}>
                 {chips.map((c) => (
@@ -158,6 +197,15 @@ const st = StyleSheet.create({
   dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: C.accent },
   status: { fontSize: 14, color: C.accent },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  minutes: { gap: 8 },
+  minutesRow: { flexDirection: 'row', alignItems: 'baseline', gap: 10 },
+  minutesText: { flex: 1, fontSize: 16, fontWeight: '700', color: C.onDark },
+  minutesMeta: { fontSize: 13, color: C.onDark3 },
+  bar: { height: 6, borderRadius: 3, backgroundColor: '#26262B', overflow: 'hidden' },
+  barFill: { height: 6, borderRadius: 3, backgroundColor: C.accent },
+  morePill: { alignSelf: 'flex-start', minHeight: 36, paddingHorizontal: 14, borderRadius: 18, borderWidth: 1.5, borderColor: '#F5A524', justifyContent: 'center' },
+  moreText: { fontSize: 14, fontWeight: '700', color: '#F5C26B' },
+  planNote: { fontSize: 14, color: C.onDark3 },
   chip: { height: 30, paddingHorizontal: 12, borderRadius: 15, backgroundColor: '#1E1E24', justifyContent: 'center', maxWidth: '100%' },
   chipText: { fontSize: 14, fontWeight: '600', color: C.chipText },
   callBtn: { height: 64, borderRadius: 32, backgroundColor: C.accent, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },

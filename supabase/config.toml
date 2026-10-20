@@ -16,6 +16,6 @@ port = 54323
 [auth]
 enabled = true
 
-# The Hola app calls start-live without a Supabase sign-in; the access code is the check.
+# The Hola app calls start-live without a Supabase sign-in; Apple's signature on its subscription (or an owner code) is the check.
 [functions.start-live]
 verify_jwt = false

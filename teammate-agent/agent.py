@@ -74,6 +74,8 @@ SIGNED_UP_SILENCE_SECONDS = float(os.getenv("SIGNED_UP_SILENCE_SECONDS", "180"))
 REP_WAIT_SECONDS = float(os.getenv("REP_WAIT_SECONDS", "10"))  # after "Quentin, are you there?": then "Quentin?" once, then carries on
 REP_TALK_SECONDS = float(os.getenv("REP_TALK_SECONDS", "25"))  # once he answers her, his English counts as him this long
 MAX_MINUTES = float(os.getenv("MAX_MINUTES", "20"))
+# when the rep's plan runs out mid-call, Ana keeps going this long so the door isn't cut off
+OUT_OF_MINUTES_GRACE = float(os.getenv("OUT_OF_MINUTES_GRACE", "180"))
 TIMEZONE = os.getenv("TIMEZONE", "America/Chicago")
 PHONE_TOPIC = "hola"
 REP_PREFIX = "[rep]"  # lines the rep sent from his phone: a tapped reply
@@ -618,6 +620,20 @@ def transcription_settings(playbook: Playbook, model: str) -> AudioTranscription
     return AudioTranscription(model=model, prompt=prompt)
 
 
+def call_seconds(meta: dict[str, Any]) -> tuple[float, float | None]:
+    """How long this call may run, and when the rep's plan minutes run out (None: no plan limit).
+    start-live puts seconds_left in the dispatch metadata."""
+    cap = MAX_MINUTES * 60
+    try:
+        left = float(meta["seconds_left"])
+    except (KeyError, TypeError, ValueError):
+        return cap, None
+    left = max(0.0, left)
+    if left >= cap:
+        return cap, None
+    return min(cap, left + OUT_OF_MINUTES_GRACE), left
+
+
 def job_metadata(ctx: JobContext) -> dict[str, Any]:
     raw = getattr(ctx.job, "metadata", "") or ""
     if not raw:
@@ -830,12 +846,18 @@ async def entrypoint(ctx: JobContext) -> None:
         spawn(end_if_still_quiet(quiet["since"]))
 
     async def time_limit() -> None:
-        await asyncio.sleep(MAX_MINUTES * 60)
+        limit, plan_out = call_seconds(meta)
+        if plan_out is not None:  # the rep's plan runs out first: warn him, then a short grace
+            await asyncio.sleep(plan_out)
+            await phone.send("minutes_out", grace_seconds=round(limit - plan_out))
+            await asyncio.sleep(limit - plan_out)
+        else:
+            await asyncio.sleep(limit)
         session.generate_reply(
             instructions=f"Wrap up politely in one sentence and say {playbook.rep_name} will take it from here."
         )
         await asyncio.sleep(12)
-        await end("time_limit")
+        await end("out_of_minutes" if plan_out is not None else "time_limit")
 
     @session.on("metrics_collected")
     def _on_metrics(ev) -> None:
