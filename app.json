@@ -9,7 +9,15 @@
     "newArchEnabled": true,
     "plugins": [
       "./plugins/withWhisperCpp",
-      "expo-iap"
+      "expo-iap",
+      "@livekit/react-native-expo-plugin",
+      [
+        "@config-plugins/react-native-webrtc",
+        {
+          "microphonePermission": "Hola D2D needs microphone access to listen and translate conversations in real-time.",
+          "cameraPermission": "Hola D2D doesn't use your camera. The calling feature asks for this by default."
+        }
+      ]
     ],
     "splash": {
       "image": "./assets/splash.png",
@@ -22,7 +30,6 @@
       "infoPlist": {
         "NSMicrophoneUsageDescription": "Hola D2D needs microphone access to listen and translate conversations in real-time.",
         "UIBackgroundModes": [
-          "audio",
           "audio"
         ],
         "ITSAppUsesNonExemptEncryption": false

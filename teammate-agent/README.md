@@ -74,14 +74,24 @@ Messages arrive on the LiveKit data channel, topic `hola`, as JSON:
 | `callback` | a spouse, roommate or owner must decide | `status`, `name`, `phone`, `when` (as said), `at` (date and time), `decision_maker` |
 | `review_prices` | the playbook wasn't checked today (the daily price check) | `reviewed_on` |
 | `move_on` | no real need, a firm no, or a stall | `reason` |
-| `ended` | after 30 s of silence or the time limit | `reason`, `seconds` |
+| `ended` | after 30 s of silence or the time limit | `reason`, `seconds`, `cost_usd` |
+| `hello` | Ana just joined and wants the playbook (repeats each second until it comes) | none |
 
-The phone sends the playbook as job metadata: `{"playbook": {...}, "user_id": "...", "rep_identity": "..."}`.
-`rep_identity` is the phone's LiveKit identity; messages from anyone else in the room are ignored.
+What the phone sends, same topic:
 
-The phone can also send Ana a line from the rep: `{"type": "rep_says", "text": "No, that's it, thank you."}`.
-It's used for the quick-reply buttons (from `checkInReplies` in the playbook) and the hold-to-talk
-button (the phone writes down what the rep said while holding it). These lines are certain to be the rep.
+| `type` | When | Fields |
+| --- | --- | --- |
+| `playbook` | answering `hello` | `playbook` (the rep's setup, like `sample_playbook.json`), `user_id` |
+| `rep_says` | the rep tapped a quick reply | `text` |
+| `rep_hold` | the rep pressed (`true`) or let go of (`false`) "Hold to jump in" | `down` |
+
+Ana waits up to `PLAYBOOK_WAIT_SECONDS` (8) for the playbook, then falls back to `PLAYBOOK_FILE`. The
+start-live function can also put the playbook in the job metadata instead:
+`{"playbook": {...}, "user_id": "...", "rep_identity": "..."}`. `rep_identity` is the phone's LiveKit
+identity (or whoever sent the playbook); messages from anyone else in the room are ignored.
+
+Quick replies and anything said while "Hold to jump in" is down (plus 3 s after, while it's
+transcribed) are certain to be the rep.
 
 ## Who counts as the rep
 
@@ -129,11 +139,24 @@ Like a real interpreter, Ana steps aside and talks to you in English, then goes 
   number, or a card or bank number. Those go straight to you.
 - She also checks in before agreeing to anything your facts don't cover (an install time, an exception).
 
-## Connect it to LiveKit (needed for the phone app)
+## Use it from the iPhone app
 
-1. Make a free project at cloud.livekit.io and copy its URL, API key and API secret into `.env`.
-2. Run `python agent.py dev`. The agent waits for rooms that ask for `hola-teammate`.
-3. Step 3 of the build plan adds the `start-live` function that puts the phone in a room with it.
+1. Make a free project at cloud.livekit.io. Under Settings > Keys, copy the URL, API key and API
+   secret into `.env` (`LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`).
+2. Under Settings, turn on **Development token server** and copy its ID. In the app, open Call Ana >
+   Edit Ana's setup > Connection and paste it. (Testing only: anyone with the ID can start calls on
+   your keys, so keep it to yourself.)
+3. Double-click `start-ana-for-iphone.bat` (runs `python agent.py start`). Ana waits for calls from
+   the phone while that window is open; the PC must stay on and online.
+4. In the app: Call Ana > Go live. The phone joins a room, Ana joins, asks for the playbook, and greets.
+
+For real use, deploy `supabase/functions/start-live` (an access code and a monthly minutes cap) and
+put its URL and your code in Connection instead of the token server ID:
+
+```powershell
+supabase functions deploy start-live --no-verify-jwt
+supabase secrets set LIVEKIT_URL=wss://... LIVEKIT_API_KEY=... LIVEKIT_API_SECRET=... TEAMMATE_ACCESS_CODES=pick-a-code
+```
 
 ## Tests
 

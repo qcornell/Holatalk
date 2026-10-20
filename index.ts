@@ -1,3 +1,5 @@
+// LiveKit's WebRTC setup must load before anything else (Teammate mode)
+import './src/teammate/livekitSetup';
 import { registerRootComponent } from 'expo';
 
 import App from './App';

@@ -74,7 +74,9 @@ REP_TALK_SECONDS = float(os.getenv("REP_TALK_SECONDS", "25"))  # once he answers
 MAX_MINUTES = float(os.getenv("MAX_MINUTES", "20"))
 TIMEZONE = os.getenv("TIMEZONE", "America/Chicago")
 PHONE_TOPIC = "hola"
-REP_PREFIX = "[rep]"  # lines the rep sent from his phone: a tapped reply or his hold-to-talk button
+REP_PREFIX = "[rep]"  # lines the rep sent from his phone: a tapped reply
+REP_HOLD_GRACE = 3.0  # after he lets go of hold-to-talk, his last words may still be being transcribed
+PLAYBOOK_WAIT_SECONDS = float(os.getenv("PLAYBOOK_WAIT_SECONDS", "8"))  # for the phone to send its setup
 CALLBACK_MAX_DAYS = 60
 
 
@@ -189,10 +191,11 @@ def calls_rep(text: str, rep: str) -> bool:
     return bool(re.search(rf"\b{name}\b\W{{0,4}}(?:hey\W+)?{there}|{there}\W{{0,4}}{name}\b", text, re.I))
 
 
-def who_said(text: str, waiting_for_rep: bool) -> tuple[str, bool, bool]:
-    """(clean text, is_rep, english). The rep is certain for a [rep] line from his phone, and likely
-    for English that answers Ana's check-in. Other English could be a bilingual customer."""
-    verified = text.startswith(REP_PREFIX)
+def who_said(text: str, waiting_for_rep: bool, holding: bool = False) -> tuple[str, bool, bool]:
+    """(clean text, is_rep, english). The rep is certain for a [rep] line from his phone or speech
+    while he holds his talk button, and likely for English that answers Ana's check-in. Other English
+    could be a bilingual customer."""
+    verified = text.startswith(REP_PREFIX) or holding
     clean = text.removeprefix(REP_PREFIX).strip()
     english = looks_english(clean)
     return clean, verified or (english and waiting_for_rep), english
@@ -236,6 +239,15 @@ class TeammateAgent(Agent):
         self._talk_until = 0.0    # he answered her: his English counts as him until then
         self._last_question = ""  # the last question shown on his phone
         self.lines: deque[tuple[str, str]] = deque(maxlen=60)  # (who, text): "ana", "customer" or "rep"
+        self._held_until = 0.0  # he's holding his talk button (or just let go)
+
+    def rep_hold(self, down: bool) -> None:
+        """His hold-to-talk button: what's heard while it's down (and just after) is surely him."""
+        self._held_until = float("inf") if down else time.monotonic() + REP_HOLD_GRACE
+
+    @property
+    def rep_holding(self) -> bool:
+        return time.monotonic() < self._held_until
 
     def heard(self, who: str, text: str) -> None:
         """A finished line of the conversation, as transcribed."""
@@ -599,19 +611,67 @@ def transcription_settings(playbook: Playbook, model: str) -> AudioTranscription
     return AudioTranscription(model=model, prompt=prompt)
 
 
-def load_playbook(ctx: JobContext) -> tuple[Playbook, dict[str, Any]]:
-    """The phone sends the playbook as job metadata. Console and dev fall back to a local file."""
-    meta: dict[str, Any] = {}
+def job_metadata(ctx: JobContext) -> dict[str, Any]:
     raw = getattr(ctx.job, "metadata", "") or ""
-    if raw:
+    if not raw:
+        return {}
+    try:
+        meta = json.loads(raw)
+        return meta if isinstance(meta, dict) else {}
+    except json.JSONDecodeError:
+        logger.warning("job metadata isn't JSON; ignoring it")
+        return {}
+
+
+def local_playbook() -> Playbook:
+    return Playbook.from_file(os.getenv("PLAYBOOK_FILE", str(HERE / "sample_playbook.json")))
+
+
+async def playbook_from_phone(ctx: JobContext, phone: PhoneBridge) -> tuple[dict[str, Any], str] | None:
+    """Ask the rep's phone for its setup ("hello"), and wait for {"type": "playbook"}. Returns the message
+    and who sent it, or None if nothing came (an old app, or a test room)."""
+    got: asyncio.Future = asyncio.get_running_loop().create_future()
+
+    def on_data(packet) -> None:
+        if packet.topic != PHONE_TOPIC or got.done():
+            return
         try:
-            meta = json.loads(raw)
-        except json.JSONDecodeError:
-            logger.warning("job metadata isn't JSON; using the local playbook file")
+            msg = json.loads(packet.data.decode("utf-8"))
+        except (ValueError, UnicodeDecodeError):
+            return
+        if msg.get("type") == "playbook" and isinstance(msg.get("playbook"), dict):
+            got.set_result((msg, str(getattr(packet.participant, "identity", "") or "")))
+
+    ctx.room.on("data_received", on_data)
+    try:
+        deadline = time.monotonic() + PLAYBOOK_WAIT_SECONDS
+        while time.monotonic() < deadline:
+            await phone.send("hello")  # the phone answers with its playbook
+            try:
+                return await asyncio.wait_for(asyncio.shield(got), timeout=1.0)
+            except asyncio.TimeoutError:
+                continue
+        return None
+    finally:
+        ctx.room.off("data_received", on_data)
+
+
+async def load_playbook(ctx: JobContext, phone: PhoneBridge, console: bool) -> tuple[Playbook, dict[str, Any]]:
+    """Where Ana's setup comes from: job metadata (the start-live function), else the phone sends it when
+    Ana joins, else the local file (console mode and tests). Returns it with the call's metadata."""
+    meta = job_metadata(ctx)
     if isinstance(meta.get("playbook"), dict):
         return Playbook.from_dict(meta["playbook"]), meta
-    path = os.getenv("PLAYBOOK_FILE", str(HERE / "sample_playbook.json"))
-    return Playbook.from_file(path), meta
+    if not console:
+        sent = await playbook_from_phone(ctx, phone)
+        if sent:
+            msg, sender = sent
+            meta = {**meta, "user_id": meta.get("user_id") or str(msg.get("user_id") or "")}
+            meta.setdefault("rep_identity", sender)
+            logger.info("playbook from the phone (%d bytes)", len(json.dumps(msg["playbook"])))
+            return Playbook.from_dict(msg["playbook"]), meta
+        logger.warning("the phone didn't send a playbook; using the local file")
+    return local_playbook(), meta
 
 
 server = AgentServer()
@@ -619,15 +679,17 @@ server = AgentServer()
 
 @server.rtc_session(agent_name=os.getenv("AGENT_NAME", "hola-teammate"))
 async def entrypoint(ctx: JobContext) -> None:
-    playbook, meta = load_playbook(ctx)
+    console = ctx.is_fake_job()
     phone = PhoneBridge(ctx)
+    if not console:  # console mode runs without a LiveKit room
+        await ctx.connect()
+    playbook, meta = await load_playbook(ctx, phone, console)
     meter = CostMeter(voice_model=MODEL_NAME, transcribe_model="" if ENGINE == "live" else TRANSCRIBE_MODEL)
     # building these clients takes ~0.5 s; keep it off the audio loop
     captions = await asyncio.to_thread(Captioner, lambda m, u: meter.add_chat("captions", m, u))
     judge = await asyncio.to_thread(OfferJudge, None, lambda m, u: meter.add_chat("price checks", m, u))
     started = time.monotonic()
     tasks: set[asyncio.Task] = set()
-    console = ctx.is_fake_job()
 
     today = now_local()
     base_amounts = playbook.allowed_amounts(now=today)
@@ -645,8 +707,6 @@ async def entrypoint(ctx: JobContext) -> None:
         tasks.add(t)
         t.add_done_callback(tasks.discard)
 
-    if not console:  # console mode runs without a LiveKit room
-        await ctx.connect()
     room_name = getattr(ctx.room, "name", "") if not console else ""
     call_id = room_name or f"console-{int(time.time())}"
     user_id = str(meta.get("user_id") or "local")
@@ -687,7 +747,7 @@ async def entrypoint(ctx: JobContext) -> None:
         if not text:
             return
         if item.role == "user":
-            clean, is_rep, english = who_said(text, agent.waiting_for_rep)
+            clean, is_rep, english = who_said(text, agent.waiting_for_rep, agent.rep_holding)
             amounts = amounts_in_text(clean, money_only=False)
             if is_rep:
                 rep_amounts.update(amounts)
@@ -708,7 +768,7 @@ async def entrypoint(ctx: JobContext) -> None:
             agent.heard("ana", text)
 
     def _on_data(packet) -> None:
-        """The rep tapped a quick reply, or used his hold-to-talk button, on his phone."""
+        """The rep tapped a quick reply, or pressed or let go of his hold-to-talk button, on his phone."""
         if packet.topic != PHONE_TOPIC:
             return
         sender = getattr(packet.participant, "identity", None)
@@ -723,6 +783,10 @@ async def entrypoint(ctx: JobContext) -> None:
         if msg.get("type") == "rep_says" and text:
             agent.heard_rep()
             session.generate_reply(user_input=f"{REP_PREFIX} {text}")
+        elif msg.get("type") == "rep_hold":
+            agent.rep_hold(bool(msg.get("down")))
+        elif msg.get("type") == "playbook":
+            pass  # already loaded; the phone may answer a late "hello" twice
 
     if not console:
         ctx.room.on("data_received", _on_data)

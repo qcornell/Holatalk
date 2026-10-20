@@ -40,6 +40,8 @@ import SetupScreen from './src/screens/SetupScreen';
 import ConvoScreen from './src/screens/ConvoScreen';
 import TeachMeScreen from './src/screens/TeachMeScreen';
 import PaywallScreen from './src/screens/PaywallScreen';
+import TeammateFlow from './src/teammate/TeammateFlow';
+import { PhoneIcon } from './src/teammate/icons';
 import { checkSubscriptionStatus, disconnectStore } from './src/subscription';
 import * as Speech from './src/speech';
 
@@ -117,6 +119,7 @@ export default function App() {
   const [showSetup, setShowSetup] = useState<boolean | null>(null); // null = loading
   const [showConvo, setShowConvo] = useState(false);
   const [showTeachMe, setShowTeachMe] = useState(false);
+  const [showTeammate, setShowTeammate] = useState(false);
   const [isSubscribed, setIsSubscribed] = useState<boolean | null>(null); // null = checking
   const [userSetup, setUserSetup] = useState<UserSetup | null>(null);
   const [repProfile, setRepProfile] = useState<RepProfile | null>(null);
@@ -1024,6 +1027,15 @@ export default function App() {
     );
   }
 
+  // Teammate mode: Ana, the AI Spanish rep, on speakerphone
+  if (showTeammate) {
+    return (
+      <SafeAreaProvider style={{ flex: 1 }}>
+        <TeammateFlow userSetup={userSetup} onExit={() => setShowTeammate(false)} />
+      </SafeAreaProvider>
+    );
+  }
+
   // Convo Mode Screen
   if (showConvo) {
     return (
@@ -1460,6 +1472,15 @@ export default function App() {
               </TouchableOpacity>
             </View>
 
+            <TouchableOpacity style={s.teammateBtn} onPress={() => setShowTeammate(true)} activeOpacity={0.85}
+              accessibilityLabel="Call Ana, your AI Spanish rep">
+              <View style={s.teammateIcon}><PhoneIcon size={20} color="#050507" /></View>
+              <View style={{ flex: 1 }}>
+                <Text style={s.teammateTitle}>Call Ana</Text>
+                <Text style={s.teammateSub}>Your Spanish rep on speaker</Text>
+              </View>
+            </TouchableOpacity>
+
             <View style={{ flexDirection: 'row', gap: 10, marginTop: 16, flexWrap: 'wrap', justifyContent: 'center' }}>
               <TouchableOpacity style={s.sleepSettingsBtn} onPress={() => setShowSetup(true)} activeOpacity={0.7}>
                 <Text style={s.sleepSettingsTxt}>⚙️ Settings</Text>
@@ -1584,6 +1605,10 @@ const s = StyleSheet.create({
   sleepDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#FBBF24' },
   sleepText: { fontSize: 14, color: '#A0A3BD', fontWeight: '500' },
   sleepButtons: { flexDirection: 'row', gap: 12, flexWrap: 'wrap', justifyContent: 'center' },
+  teammateBtn: { flexDirection: 'row', alignItems: 'center', gap: 14, alignSelf: 'stretch', marginTop: 16, paddingVertical: 14, paddingHorizontal: 18, backgroundColor: '#050507', borderRadius: 22 },
+  teammateIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#30D59B', alignItems: 'center', justifyContent: 'center' },
+  teammateTitle: { fontSize: 17, fontWeight: '700', color: '#FFFFFF' },
+  teammateSub: { fontSize: 13, color: '#A1A1AA', marginTop: 2 },
   manualWakeBtn: { paddingVertical: 14, paddingHorizontal: 24, backgroundColor: '#7C5CFC', borderRadius: 28, elevation: 5 },
   manualWakeTxt: { fontSize: 15, fontWeight: '700', color: '#FFFFFF' },
   assistBtnBig: { paddingVertical: 14, paddingHorizontal: 24, backgroundColor: '#10B981', borderRadius: 28, elevation: 5 },
