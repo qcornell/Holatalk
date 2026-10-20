@@ -98,8 +98,8 @@ def test_save_lead_saves_first_then_checks_in_once():
     async def run():
         a, phone, store = make_agent()
         out = await a.save_lead(None, "María López", "(979) 555-0142", "maria@ejemplo.com", True,
-                                payment="debit card")
-        assert "'Quentin, are you there?' and stop talking" in out
+                                     payment="debit card")
+        assert '"Perfecto, ya quedó. Un momentito, déjeme hablar con Quentin. Quentin, are you there?"' in out
         assert out.index("are you there") < out.index("I've got their name, number and email")
         assert [k for k, _ in phone.sent] == ["lead", "check_in"]
         assert phone.sent[0][1]["status"] == "saved"
@@ -173,8 +173,8 @@ def test_ask_rep_is_asked_out_loud_in_english():
         a = agent.TeammateAgent(PB, phone)
         a.wait_for_rep = lambda: None
         out = await a.ask_rep(None, "Is there a deposit?")
-        assert "Déjeme confirmarlo con Quentin" in out and "'Quentin, are you there?'" in out
-        assert out.index("are you there") < out.index("'Is there a deposit?'")
+        assert '"Buena pregunta. Déjeme confirmarlo con Quentin. Quentin, are you there?"' in out
+        assert out.index("are you there") < out.index('"Is there a deposit?"')
         assert phone.sent == [("ask_rep", {"question": "Is there a deposit?"})]
     asyncio.run(run())
 
@@ -221,9 +221,11 @@ def test_rep_lines_are_recognized_as_english():
 # ---- calling Quentin over before talking to him
 
 def test_instructions_call_him_over_every_time():
-    section = TEXT.split("# Checking in with Quentin")[1].split("# ")[0]
+    section = " ".join(TEXT.split("# Checking in with Quentin")[1].split("# ")[0].split())
     assert "EVERY time you turn from the customer" in section
-    assert '"Quentin, are you there?" Then stop talking and wait' in section
+    assert ('Say it in one go: "Un momentito, déjeme hablar con Quentin. Quentin, are you there?" Then stop '
+            "talking and wait. Don't ask him anything yet.") in section
+    assert 'the next short English reply ("yeah", "go ahead", "I\'m here") is Quentin answering you' in " ".join(TEXT.split())
     assert "skip \"are you there?\"" in section  # not when he just spoke to her
     assert "Quentin, are you\n    there?" in TEXT  # also before asking him about English
 
@@ -275,3 +277,33 @@ def test_the_wait_starts_when_she_says_are_you_there():
         assert "carry on" in said[-1] and len(said) == 2
         assert not a.waiting_for_rep
     asyncio.run(run())
+
+
+def test_asking_again_after_he_answers_does_not_call_him_over_twice():
+    class FakeSession:
+        def generate_reply(self, **kw):
+            pass
+
+    class QuietAgent(agent.TeammateAgent):
+        session = FakeSession()
+
+    async def run():
+        agent.REP_WAIT_SECONDS = 5
+        phone = FakePhone()
+        a = QuietAgent(PB, phone)
+        first = await a.ask_rep(None, "Is there a deposit?")
+        assert "are you there?" in first and a.waiting_for_rep
+        # before he answers, a second call just waits
+        assert (await a.ask_rep(None, "Is there a deposit?")).startswith("You already called Quentin")
+        a.heard_rep()  # "yeah"
+        again = await a.ask_rep(None, "Is there a deposit?")
+        assert "Quentin is listening now" in again and "are you there" not in again
+        assert 'Ask him in English: "Is there a deposit?" and stop' in again
+        assert phone.sent == [("ask_rep", {"question": "Is there a deposit?"})]  # shown on his phone once
+        a._talk_until = 0
+        # a new question later calls him over again
+        later = await a.ask_rep(None, "Can they get installed Saturday?")
+        assert "are you there?" in later and phone.sent[-1][1]["question"] == "Can they get installed Saturday?"
+        await a.on_exit()
+    asyncio.run(run())
+

@@ -230,6 +230,7 @@ class TeammateAgent(Agent):
         self._waiting: asyncio.Task | None = None  # Ana called the rep and is waiting for him to answer
         self._nudged = False      # she already said his name a second time
         self._talk_until = 0.0    # he answered her: his English counts as him until then
+        self._last_question = ""  # the last question shown on his phone
 
     async def on_enter(self) -> None:
         self.session.generate_reply(
@@ -254,6 +255,7 @@ class TeammateAgent(Agent):
         self.rep_heard_at = now
         if self._calling:
             self._waiting.cancel()
+            self._waiting = None
 
     def wait_for_rep(self) -> None:
         """Ana is calling the rep. Start the clock (again) from now: if he says nothing, she says his name
@@ -295,12 +297,16 @@ class TeammateAgent(Agent):
                 logger.debug("nudge skipped: %s", e)
                 return
 
-    def _turn_to_rep(self, spanish: str, then: str) -> str:
-        """How Ana turns from the customer to the rep: Spanish to the customer, then his name in English,
-        because he can't tell when her Spanish is meant for him."""
+    def _call_over(self, before: str, spanish: str, then: str) -> str:
+        """Ana turns from the customer to the rep: a Spanish line for the customer, then his name in English,
+        because he can't tell when her Spanish is meant for him. Then she waits for him. `then` is what she
+        does once he answers. (Having the app force the line with generate_reply tested worse: she ignored
+        it. One exact line in the tool result works.)"""
         rep = self.playbook.rep_name
-        return (f"Tell the customer in Spanish: '{spanish}' Then say in English: '{rep}, are you there?' and stop "
-                f"talking. When he answers, {then}")
+        self.wait_for_rep()
+        return (f'{before}Say exactly this now, all of it, then stop and wait: "{spanish} {rep}, are you there?" '
+                f"Don't say anything else to {rep} yet. Only after {rep} answers you (a short English reply like "
+                f"\"yeah\", \"go ahead\" or \"I'm here\" is {rep}): {then}")
 
     async def on_exit(self) -> None:
         if self._calling:
@@ -389,21 +395,21 @@ class TeammateAgent(Agent):
         ok = await self.store({"call_id": self.call_id, "user_id": self.user_id, "kind": "signup", **fields})
         if not ok:
             await self.phone.send("lead", status="not_saved", fields=fields)
-            self.wait_for_rep()
-            return "NOT saved: the save didn't go through. Don't tell the customer it's saved. " + self._turn_to_rep(
+            return self._call_over(
+                "NOT saved: the save didn't go through. Don't tell the customer it's saved. ",
                 "Un momentito, por favor.",
-                "say in English: 'The save didn't go through. Can you write down their info?' Then carry on.")
+                "say in English: \"The save didn't go through. Can you write down their info?\" Then carry on.")
         first_save = not self.lead
         self.lead = fields
         await self.phone.send("lead", status="saved", fields=fields)
         if not first_save:
             return "Updated and saved. Carry on where you were."
         await self.phone.send("check_in", reason="sign-up saved")
-        self.wait_for_rep()
-        return f"Saved. Now check in with {rep}. " + self._turn_to_rep(
+        return self._call_over(
+            f"Saved. Now you're checking in with {rep}. ",
             f"Perfecto, ya quedó. Un momentito, déjeme hablar con {rep}.",
-            "say in English: 'I've got their name, number and email. Anything else you want me to ask or "
-            "explain?' Then wait for his answer. If they tell you how they'll pay later, call save_lead again with it.")
+            "say in English: \"I've got their name, number and email. Anything else you want me to ask or "
+            "explain?\" Then wait for his answer. If they tell you how they'll pay later, call save_lead again with it.")
 
     @function_tool
     async def ask_rep(self, context: RunContext, question: str) -> str:
@@ -411,15 +417,27 @@ class TeammateAgent(Agent):
         something they don't cover. Never guess instead.
 
         Args:
-            question: The customer's question, in short plain English.
+            question: What you'll ask him, in a few plain English words, for example "Is there a deposit?"
+                or "Can they get installed Saturday?"
         """
-        await self.phone.send("ask_rep", question=question)
-        self.wait_for_rep()
         rep = self.playbook.rep_name
-        return self._turn_to_rep(
+        then_answer = ("When he answers, turn back to the customer and give them his answer in Spanish, keeping "
+                       "his numbers and details exactly (translate it; don't repeat his English or say \"él dijo\"). "
+                       "Then carry on.")
+        if self._calling:  # she already called him over and he hasn't answered yet
+            return f'You already called {rep}. Wait. When he answers, ask him in English: "{question}" and stop.'
+        if question != self._last_question:
+            await self.phone.send("ask_rep", question=question)
+            self._last_question = question
+        if time.monotonic() < self._talk_until:  # he answered her call and is listening
+            self._talk_until = time.monotonic() + REP_TALK_SECONDS
+            return (f'{rep} is listening now, so don\'t call him again. Ask him in English: "{question}" and stop. '
+                    f"Say nothing to the customer while you wait. {then_answer}")
+        return self._call_over(
+            "",
             f"Buena pregunta. Déjeme confirmarlo con {rep}.",
-            f"ask him in one short English line: '{question}' (If he already answered it, don't ask again.) "
-            "Then wait. When he answers, tell the customer in Spanish, using exactly what he said.")
+            f'ask him in English: "{question}" and stop. Say nothing to the customer while you wait. (If he '
+            f"already answered it, don't ask again.) {then_answer}")
 
     @function_tool
     async def schedule_callback(
@@ -446,10 +464,10 @@ class TeammateAgent(Agent):
         if not await self.store(record):
             await self.phone.send("callback", status="not_saved", name=name.strip(), phone=digits,
                                   when=when_spoken.strip(), at=at.isoformat())
-            self.wait_for_rep()
-            return "NOT saved: the save didn't go through. " + self._turn_to_rep(
+            return self._call_over(
+                "NOT saved: the save didn't go through. ",
                 "Un momentito, por favor.",
-                "say in English: 'The callback didn't save. Can you write it down?' Then repeat the day and time "
+                "say in English: \"The callback didn't save. Can you write it down?\" Then repeat the day and time "
                 "back to the customer.")
         await self.phone.send("callback", status="saved", name=name.strip(), phone=digits, when=when_spoken.strip(),
                               at=at.isoformat(), decision_maker=decision_maker.strip())
