@@ -5,13 +5,15 @@
  * sample_playbook.json). The phone sends it to Ana when she joins the call.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import type { IndustryId, PricePer } from './industries';
+import { industry as industryPack } from './industries';
 
 const KEY = '@hola_teammate_settings';
 
 export interface PriceOption {
   /** How they pay, in English, e.g. "Autopay from a checking account" */
   how: string;
-  /** The same in Spanish, as Ana says it */
+  /** The same in Spanish, as Ana says it (optional: Ana translates it herself when blank) */
   howEs: string;
   priceMonthly: number;
 }
@@ -19,6 +21,7 @@ export interface PriceOption {
 export interface TeammatePlan {
   name: string;
   speed: string;
+  /** The price (monthly, or one time when the industry's prices are one-time) */
   priceMonthly: number;
   priceOptions: PriceOption[];
 }
@@ -39,6 +42,8 @@ export interface Connection {
 }
 
 export interface TeammateSettings {
+  /** What the rep sells; sets Ana's approach and the questions below */
+  industry: IndustryId;
   repName: string;
   companyName: string;
   assistantName: string;
@@ -59,47 +64,25 @@ export interface TeammateSettings {
   deviceId: string;
 }
 
-/** The customer questions, by topic, with blanks for anything not known yet. */
-export const FACT_TOPICS: Record<string, string[]> = {
-  'Your offer': [
-    'Price includes taxes and fees (yes / no, about $ extra / not sure)',
-    'Price stays the same for (12 months / 24 months / always / not sure)',
-    'Current promo and when it ends',
-  ],
-  'The rules': [
-    'Contract (none / 12 months / 24 months)',
-    'Cancellation fee',
-    'Credit check (yes / no)',
-    'Social Security number needed (yes / no)',
-    "IDs accepted (matrícula, passport, ITIN, state ID, driver's license)",
-    'Deposit (none / $)',
-  ],
-  'Install and paying': [
-    'Install fee (free / $)',
-    'Soonest install (same day / next day / within 3 days / within a week)',
-    'How long the install takes',
-    'Who must be home (an adult 18 or older)',
-    'Drilling or new wires',
-    'Autopay (required / optional / not offered)',
-    'Autopay discount',
-    'Ways to pay (card / debit / bank account / cash at a store / money order)',
-    'First bill (when and how much)',
-  ],
-  Extras: [
-    'Router and equipment included, and any equipment fee',
-    'Data limit',
-    'Spanish customer service number',
-    'Number customers can call to check you are real',
-    'Local store',
-    'Help switching from their old company, or paying their old cancellation fee',
-    "Renters: is the landlord's OK needed",
-  ],
-};
+/** The internet questions (kept for older callers; use factTopics(s) for the rep's own industry). */
+export const FACT_TOPICS: Record<string, string[]> = industryPack('internet').factTopics;
 
-function blankFacts(): Record<string, Record<string, string>> {
+/** The customer questions for this rep's industry. */
+export function factTopics(s: Pick<TeammateSettings, 'industry'>): Record<string, string[]> {
+  return industryPack(s.industry).factTopics;
+}
+
+export function pricePer(s: Pick<TeammateSettings, 'industry'>): PricePer {
+  return industryPack(s.industry).per;
+}
+
+/** Blank answers for every question of an industry, keeping any answer already given to the same question. */
+export function blankFacts(id: IndustryId, keep: Record<string, Record<string, string>> = {}): Record<string, Record<string, string>> {
+  const old: Record<string, string> = {};
+  for (const answers of Object.values(keep)) for (const [q, a] of Object.entries(answers ?? {})) if (a) old[q] = a;
   const out: Record<string, Record<string, string>> = {};
-  for (const [topic, questions] of Object.entries(FACT_TOPICS)) {
-    out[topic] = Object.fromEntries(questions.map((q) => [q, '']));
+  for (const [topic, questions] of Object.entries(industryPack(id).factTopics)) {
+    out[topic] = Object.fromEntries(questions.map((q) => [q, keep[topic]?.[q] ?? old[q] ?? '']));
   }
   return out;
 }
@@ -110,50 +93,22 @@ function newDeviceId(): string {
   return `${part(8)}-${part(4)}-4${part(3)}-${part(4)}-${part(12)}`;
 }
 
-/** Quentin's current offer, so the first test works right away. Everything is editable in setup. */
-export function defaultSettings(repName = 'Quentin', companyName = ''): TeammateSettings {
-  const facts = blankFacts();
-  facts['The rules']['Contract (none / 12 months / 24 months)'] = 'None (sin contrato)';
-  facts['Install and paying']['Install fee (free / $)'] = 'Free (instalación gratis)';
-  facts['Install and paying']['Autopay (required / optional / not offered)'] =
-    'Optional, but autopay from a checking account is what gets the $35 price';
-  facts['Install and paying']['Autopay discount'] =
-    '$35 a month with checking-account autopay instead of $45 with a debit card ($10 less)';
-  facts['Install and paying']['Ways to pay (card / debit / bank account / cash at a store / money order)'] =
-    'Autopay from a checking account (account and routing number) for $35 a month, or a debit card for $45 a month';
+/** A new rep's starting point for an industry: no prices yet, every question blank. */
+export function defaultSettings(repName = '', companyName = '', id: IndustryId = 'internet'): TeammateSettings {
+  const pack = industryPack(id);
   return {
+    industry: pack.id,
     repName,
     companyName,
     assistantName: 'Ana',
-    pitch:
-      'Ofrecemos internet aquí en el área por solo $35 al mes. Si le interesa, normalmente solo necesitamos su ' +
-      'nombre, un número de teléfono y su correo, y se lo dejamos listo. La instalación es gratis y no hay ' +
-      'contrato. ¿Ya tiene una tele inteligente?',
-    plans: [
-      {
-        name: 'Internet',
-        speed: '',
-        priceMonthly: 35,
-        priceOptions: [
-          {
-            how: 'Autopay from a checking account (account and routing number)',
-            howEs: 'pago automático de su cuenta de cheques, con número de cuenta y de ruta',
-            priceMonthly: 35,
-          },
-          { how: 'Debit card', howEs: 'con tarjeta de débito', priceMonthly: 45 },
-        ],
-      },
-    ],
+    pitch: '',
+    plans: pack.per === 'none' ? [] : [{ name: pack.planName, speed: '', priceMonthly: 0, priceOptions: [] }],
     hasContract: false,
     installationFee: 0,
     promos: [],
-    facts,
+    facts: blankFacts(pack.id),
     signupBy: 'tablet',
-    checkInReplies: [
-      'Have them enter their date of birth',
-      'Have them enter their Social Security number',
-      'Explain: $35 with autopay from checking, $45 with debit',
-    ],
+    checkInReplies: [...pack.checkInReplies],
     reviewedOn: '',
     connection: {
       tokenServerId: process.env.EXPO_PUBLIC_LIVEKIT_TOKEN_SERVER_ID ?? '',
@@ -164,15 +119,34 @@ export function defaultSettings(repName = 'Quentin', companyName = ''): Teammate
   };
 }
 
+/** Switch industries: new questions and quick replies, the same name, company and connection. */
+export function withIndustry(s: TeammateSettings, id: IndustryId): TeammateSettings {
+  if (s.industry === id) return s;
+  const pack = industryPack(id);
+  const fresh = defaultSettings(s.repName, s.companyName, id);
+  return {
+    ...s,
+    industry: id,
+    plans: fresh.plans,
+    pitch: '',
+    facts: blankFacts(id, s.facts),
+    checkInReplies: [...pack.checkInReplies],
+    hasContract: pack.hasInstall ? s.hasContract : false,
+    installationFee: pack.hasInstall ? s.installationFee : 0,
+    promos: [],
+  };
+}
+
 export async function loadTeammateSettings(): Promise<TeammateSettings | null> {
   try {
     const raw = await AsyncStorage.getItem(KEY);
     if (!raw) return null;
     const saved = JSON.parse(raw) as Partial<TeammateSettings>;
-    const base = defaultSettings(saved.repName, saved.companyName);
+    const base = defaultSettings(saved.repName, saved.companyName, industryPack(saved.industry).id);
     return {
       ...base,
       ...saved,
+      industry: base.industry,
       facts: { ...base.facts, ...(saved.facts ?? {}) },
       connection: { ...base.connection, ...(saved.connection ?? {}) },
       deviceId: saved.deviceId || base.deviceId,
@@ -206,42 +180,119 @@ export function money(n: number): string {
   return Number.isInteger(n) ? `$${n}` : `$${n.toFixed(2)}`;
 }
 
+/** The prices as short chips ("$35 autopay", "$45 debit card"), for the home screen. */
+export function priceChips(s: TeammateSettings): string[] {
+  const per = pricePer(s);
+  if (per === 'none') return [];
+  const suffix = per === 'month' ? '' : ' each';
+  const out: string[] = [];
+  for (const plan of s.plans) {
+    if (plan.priceOptions.length) {
+      for (const o of plan.priceOptions) {
+        if (o.priceMonthly > 0) out.push(`${money(o.priceMonthly)} ${shortHow(o.how)}`.trim());
+      }
+    } else if (plan.priceMonthly > 0) {
+      out.push(`${money(plan.priceMonthly)}${per === 'month' ? '/mo' : suffix}`);
+    }
+  }
+  if (industryPack(s.industry).hasInstall) {
+    out.push(s.installationFee ? `${money(s.installationFee)} install` : 'Free install');
+    out.push(s.hasContract ? 'Contract' : 'No contract');
+  }
+  return out;
+}
+
+function shortHow(how: string): string {
+  const h = how.toLowerCase();
+  if (h.includes('autopay') || h.includes('checking')) return 'autopay';
+  if (h.includes('debit')) return 'debit';
+  if (h.includes('credit')) return 'credit card';
+  if (h.includes('cash')) return 'cash';
+  return how.split(/[,(]/)[0].trim().toLowerCase();
+}
+
 /** The lines the daily check shows: what Ana will tell customers today. */
 export function offerSummary(s: TeammateSettings, day = today()): { label: string; value: string }[] {
   const rows: { label: string; value: string }[] = [];
+  const per = pricePer(s);
+  if (per === 'none') {
+    // an invitation: what, when and where
+    const invite = s.facts['Your invitation'] ?? {};
+    rows.push({ label: 'When', value: invite['Event or service, day and time']?.trim() || 'Not set' });
+    rows.push({ label: 'Where', value: invite['Address']?.trim() || 'Not set' });
+    return rows;
+  }
+  const unit = per === 'month' ? '/mo' : '';
   for (const plan of s.plans) {
     if (plan.priceOptions.length) {
-      for (const o of plan.priceOptions) rows.push({ label: `${plan.name}, ${o.how}`, value: `${money(o.priceMonthly)}/mo` });
+      for (const o of plan.priceOptions) rows.push({ label: `${plan.name}, ${o.how}`, value: `${money(o.priceMonthly)}${unit}` });
+    } else if (plan.priceMonthly > 0) {
+      rows.push({ label: plan.name, value: `${money(plan.priceMonthly)}${unit}` });
     } else {
-      rows.push({ label: plan.name, value: `${money(plan.priceMonthly)}/mo` });
+      rows.push({ label: plan.name, value: 'You quote it' });
     }
   }
-  rows.push({ label: 'Install', value: s.installationFee ? money(s.installationFee) : 'Free' });
-  rows.push({ label: 'Contract', value: s.hasContract ? 'Yes' : 'None' });
+  if (industryPack(s.industry).hasInstall) {
+    rows.push({ label: 'Install', value: s.installationFee ? money(s.installationFee) : 'Free' });
+    rows.push({ label: 'Contract', value: s.hasContract ? 'Yes' : 'None' });
+  }
   const promos = activePromos(s, day);
   rows.push({ label: 'Promos', value: promos.length ? String(promos.length) : 'None' });
   return rows;
 }
 
+/** How many customer questions have an answer, out of how many. */
+export function factsAnswered(s: TeammateSettings): { answered: number; total: number } {
+  let answered = 0;
+  let total = 0;
+  for (const [topic, questions] of Object.entries(factTopics(s))) {
+    for (const q of questions) {
+      total += 1;
+      if ((s.facts[topic]?.[q] ?? '').trim()) answered += 1;
+    }
+  }
+  return { answered, total };
+}
+
+/** Ready to go out: a name, an opening line, and a price when the industry needs one. */
+export function isReady(s: TeammateSettings): boolean {
+  const pack = industryPack(s.industry);
+  if (!s.repName.trim() || !s.pitch.trim()) return false;
+  if (!pack.priceRequired) return true;
+  const plan = s.plans[0];
+  if (!plan) return false;
+  return plan.priceOptions.length ? plan.priceOptions.every((o) => o.priceMonthly > 0) : plan.priceMonthly > 0;
+}
+
 /** The playbook Ana reads, in the agent's format (see teammate-agent/sample_playbook.json). */
 export function toPlaybook(s: TeammateSettings): Record<string, unknown> {
+  const per = pricePer(s);
   return {
+    industry: s.industry,
     repName: s.repName.trim() || 'el representante',
     companyName: s.companyName.trim(),
     assistantName: s.assistantName.trim() || 'Ana',
     reviewedOn: s.reviewedOn,
     signupBy: s.signupBy,
     pitch: s.pitch.trim(),
-    plans: s.plans.map((p) => ({
-      name: p.name.trim() || 'Internet',
-      speed: p.speed.trim(),
-      priceMonthly: p.priceOptions.length ? Math.min(...p.priceOptions.map((o) => o.priceMonthly)) : p.priceMonthly,
-      features: [],
-      priceOptions: p.priceOptions
-        .filter((o) => o.how.trim() && o.priceMonthly > 0)
-        .map((o) => ({ how: o.how.trim(), howEs: o.howEs.trim(), priceMonthly: o.priceMonthly })),
-    })),
-    policies: { hasContract: s.hasContract, installationFee: s.installationFee },
+    plans:
+      per === 'none'
+        ? []
+        : s.plans.map((p) => {
+            const options = p.priceOptions
+              .filter((o) => o.how.trim() && o.priceMonthly > 0)
+              .map((o) => ({ how: o.how.trim(), howEs: o.howEs.trim(), priceMonthly: o.priceMonthly }));
+            const lowest = options.length ? Math.min(...options.map((o) => o.priceMonthly)) : p.priceMonthly;
+            return {
+              name: p.name.trim() || industryPack(s.industry).planName,
+              speed: p.speed.trim(),
+              priceMonthly: lowest > 0 ? lowest : null,
+              per,
+              features: [],
+              priceOptions: options,
+            };
+          }),
+    policies: industryPack(s.industry).hasInstall ? { hasContract: s.hasContract, installationFee: s.installationFee } : {},
     promos: s.promos
       .filter((p) => p.descriptionEs.trim())
       .map((p) => ({ descriptionEs: p.descriptionEs.trim(), description: p.description.trim(), ...(p.expiresAt ? { expiresAt: p.expiresAt } : {}) })),

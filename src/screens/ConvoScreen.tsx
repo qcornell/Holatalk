@@ -1,12 +1,15 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+/**
+ * Convo: small talk for inside the house. Tap a phrase and the phone says it in Spanish, out loud
+ * or in your ear. Phrases are editable, and you can add your own (typed in English, translated).
+ */
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
-  TouchableOpacity,
+  Pressable,
   StyleSheet,
   StatusBar,
   ScrollView,
-  Animated,
   Platform,
   Modal,
   TextInput,
@@ -14,15 +17,19 @@ import {
   KeyboardAvoidingView,
   ActivityIndicator,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { speakSpanishLoud, speakSpanishPrivate, stopSpeaking } from '../voice';
 import { translateEnglishToSpanish } from '../translate';
-import { UserSetup } from '../config/storage';
 import type { RepProfile } from '../config/storage';
+import { industry } from '../teammate/industries';
+import { PencilIcon, PlusIcon, SpeakerIcon } from '../teammate/icons';
+import { BackButton, Button, C } from '../main/ui';
 
 interface ConvoScreenProps {
-  userSetup: UserSetup | null;
+  repName: string;
+  /** What the rep sells; picks the topics that fit (no "Faith" small talk on a fundraiser, etc.) */
+  industryId: string;
   repProfile?: RepProfile | null;
   onBack: () => void;
 }
@@ -43,32 +50,21 @@ interface CustomPhraseData {
 const CUSTOM_PHRASES_KEY = '@hola_custom_phrases';
 
 const ALL_CATEGORIES = [
-  { id: 'intro', icon: '👋', label: 'Intro' },
-  { id: 'home', icon: '🏠', label: 'Home' },
-  { id: 'kids', icon: '👶', label: 'Kids' },
-  { id: 'weather', icon: '☀️', label: 'Weather' },
-  { id: 'faith', icon: '⛪', label: 'Faith' },
-  { id: 'work', icon: '💼', label: 'Work' },
-  { id: 'food', icon: '🍽️', label: 'Food' },
-  { id: 'hobbies', icon: '🎮', label: 'Hobbies' },
+  { id: 'intro', label: 'Intro' },
+  { id: 'home', label: 'Home' },
+  { id: 'kids', label: 'Kids' },
+  { id: 'weather', label: 'Weather' },
+  { id: 'faith', label: 'Faith' },
+  { id: 'work', label: 'Work' },
+  { id: 'food', label: 'Food' },
+  { id: 'hobbies', label: 'Hobbies' },
 ];
 
-function getCategoriesForTemplate(template: string) {
-  switch (template) {
-    case 'ministry':
-      return ALL_CATEGORIES.filter(c => ['intro', 'home', 'kids', 'weather', 'faith', 'food'].includes(c.id));
-    case 'sales':
-      return ALL_CATEGORIES.filter(c => ['intro', 'home', 'kids', 'weather', 'food', 'hobbies'].includes(c.id));
-    default:
-      return ALL_CATEGORIES;
-  }
-}
-
-const getBuiltInPhrases = (catId: string, setup: UserSetup | null, profile?: RepProfile | null): Phrase[] => {
-  const name = setup?.repName || 'Friend';
-  const kids = profile?.kidsCount ?? (setup as any)?.kidsCount ?? '0';
+const getBuiltInPhrases = (catId: string, repName: string, profile?: RepProfile | null): Phrase[] => {
+  const name = repName || 'Friend';
+  const kids = profile?.kidsCount || 0;
   const kidsNames = profile?.kidsNames || '';
-  const hometown = profile?.hometown || (setup as any)?.hometown || 'Texas';
+  const hometown = profile?.hometown || 'Texas';
   const repHobbies = profile?.hobbies || [];
 
   switch (catId) {
@@ -88,8 +84,14 @@ const getBuiltInPhrases = (catId: string, setup: UserSetup | null, profile?: Rep
       const kidsPhrases: Phrase[] = [
         { label: 'Cute kids!', es: '¡Qué niños tan lindos!' },
         { label: 'How old are they?', es: '¿Cuántos años tienen?' },
-        { label: `I have ${kids} kids too.`, es: `Yo también tengo ${kids} hijos.` },
       ];
+      if (kids > 0) {
+        kidsPhrases.push(
+          kids === 1
+            ? { label: 'I have a kid too.', es: 'Yo también tengo un hijo.' }
+            : { label: `I have ${kids} kids too.`, es: `Yo también tengo ${kids} hijos.` },
+        );
+      }
       if (kidsNames) {
         kidsPhrases.push({ label: `My kids are ${kidsNames}.`, es: `Mis hijos se llaman ${kidsNames}.` });
       }
@@ -154,11 +156,12 @@ const getBuiltInPhrases = (catId: string, setup: UserSetup | null, profile?: Rep
   }
 };
 
-export default function ConvoScreen({ userSetup, repProfile, onBack }: ConvoScreenProps) {
-  const [activeCat, setActiveCat] = useState<string | null>(null);
+export default function ConvoScreen({ repName, industryId, repProfile, onBack }: ConvoScreenProps) {
+  const insets = useSafeAreaInsets();
+  const CATEGORIES = ALL_CATEGORIES.filter((c) => industry(industryId).convoCats.includes(c.id));
+  const [activeCat, setActiveCat] = useState<string>(CATEGORIES[0]?.id ?? 'intro');
   const [mode, setMode] = useState<'loud' | 'ear'>('loud');
-  const [isSpeaking, setIsSpeaking] = useState(false);
-  const expandAnim = useRef(new Animated.Value(0)).current;
+  const [speaking, setSpeaking] = useState<string | null>(null); // the Spanish being said right now
 
   // Custom phrases state
   const [customData, setCustomData] = useState<CustomPhraseData>({ edits: {}, custom: {} });
@@ -177,8 +180,6 @@ export default function ConvoScreen({ userSetup, repProfile, onBack }: ConvoScre
   const [editCatId, setEditCatId] = useState('');
   const [isTranslating, setIsTranslating] = useState(false);
   const [originalEnglish, setOriginalEnglish] = useState(''); // track what English was when we auto-translated
-
-  const CATEGORIES = getCategoriesForTemplate(userSetup?.selectedTemplate || '');
 
   // Load custom phrases on mount
   useEffect(() => {
@@ -209,25 +210,21 @@ export default function ConvoScreen({ userSetup, repProfile, onBack }: ConvoScre
     }
   }, []);
 
-  useEffect(() => {
-    Animated.timing(expandAnim, {
-      toValue: activeCat ? 1 : 0,
-      duration: 300,
-      useNativeDriver: false,
-    }).start();
-  }, [activeCat]);
+  useEffect(() => () => stopSpeaking(), []);
 
   const handleSpeak = (textEs: string) => {
-    if (isSpeaking) {
+    if (speaking) {
       stopSpeaking();
-      setIsSpeaking(false);
-      return;
+      const same = speaking === textEs;
+      setSpeaking(null);
+      if (same) return; // a second tap on the same phrase stops it
     }
-    setIsSpeaking(true);
+    setSpeaking(textEs);
+    const done = () => setSpeaking((cur) => (cur === textEs ? null : cur));
     if (mode === 'loud') {
-      speakSpanishLoud(textEs, () => setIsSpeaking(false));
+      speakSpanishLoud(textEs, done);
     } else {
-      speakSpanishPrivate(textEs, () => setIsSpeaking(false));
+      speakSpanishPrivate(textEs, done);
     }
   };
 
@@ -390,157 +387,110 @@ export default function ConvoScreen({ userSetup, repProfile, onBack }: ConvoScre
     setEditModalVisible(false);
   };
 
+  const builtIn = getBuiltInPhrases(activeCat, repName, repProfile);
+  const custom = getCustomPhrases(activeCat);
+  const items = [
+    ...builtIn.map((original, i) => ({
+      key: `b-${i}`,
+      phrase: getEffectiveBuiltIn(activeCat, i, original),
+      edit: () => openEditBuiltIn(activeCat, i, getEffectiveBuiltIn(activeCat, i, original)),
+      mine: !!customData.edits[`${activeCat}:${i}`],
+    })),
+    ...custom.map((phrase, i) => ({ key: `c-${i}`, phrase, edit: () => openEditCustom(activeCat, i, phrase), mine: true })),
+  ];
+
   return (
-    <SafeAreaView style={s.root}>
-      <StatusBar barStyle="dark-content" backgroundColor="#F5F6FB" />
-      
-      <View style={s.header}>
-        <View style={{ width: 60 }} />
-        <Text style={s.title}>Convo Mode</Text>
-        <View style={{ width: 60 }} />
-      </View>
-
-      {/* Mode Toggle */}
-      <View style={s.toggleContainer}>
-        <TouchableOpacity
-          style={[s.toggleBtn, mode === 'ear' && s.toggleActive, { borderTopLeftRadius: 20, borderBottomLeftRadius: 20 }]}
-          onPress={() => setMode('ear')}
-        >
-          <Text style={[s.toggleTxt, mode === 'ear' && s.toggleTxtActive]}>🎧 Ear (Private)</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[s.toggleBtn, mode === 'loud' && s.toggleActive, { borderTopRightRadius: 20, borderBottomRightRadius: 20 }]}
-          onPress={() => setMode('loud')}
-        >
-          <Text style={[s.toggleTxt, mode === 'loud' && s.toggleTxtActive]}>🔊 Loud (Public)</Text>
-        </TouchableOpacity>
-      </View>
-
-      <Text style={s.modeHint}>
-        {mode === 'loud' ? 'Tap to speak SPANISH to customer' : 'Tap to hear SPANISH in your ear'}
-      </Text>
-
-      <ScrollView contentContainerStyle={s.grid} showsVerticalScrollIndicator={false}>
-        {CATEGORIES.map((cat) => {
-          const isActive = activeCat === cat.id;
-          const builtInPhrases = getBuiltInPhrases(cat.id, userSetup, repProfile);
-          const customPhrases = getCustomPhrases(cat.id);
-
-          return (
-            <View key={cat.id} style={s.catWrapper}>
-              <TouchableOpacity
-                style={[s.catBtn, isActive && s.catBtnActive]}
-                onPress={() => setActiveCat(isActive ? null : cat.id)}
-                activeOpacity={0.8}
+    <SafeAreaView style={s.root} edges={['top', 'left', 'right']}>
+      <StatusBar barStyle="light-content" />
+      <View style={s.top}>
+        <View style={s.topRow}>
+          <BackButton onPress={onBack} />
+          <View style={{ flex: 1 }} />
+          <View style={s.toggle} accessibilityRole="radiogroup" accessibilityLabel="Play from">
+            {(['loud', 'ear'] as const).map((m) => (
+              <Pressable
+                key={m}
+                onPress={() => setMode(m)}
+                accessibilityRole="radio"
+                accessibilityState={{ selected: mode === m }}
+                style={[s.toggleBtn, mode === m && s.toggleOn]}
               >
-                <Text style={s.catIcon}>{cat.icon}</Text>
-                <Text style={[s.catLabel, isActive && s.catLabelActive]}>{cat.label}</Text>
-                {customPhrases.length > 0 && (
-                  <View style={s.customBadge}>
-                    <Text style={s.customBadgeTxt}>+{customPhrases.length}</Text>
-                  </View>
-                )}
-              </TouchableOpacity>
+                <Text style={[s.toggleTxt, mode === m && s.toggleTxtOn]}>{m === 'loud' ? 'Speaker' : 'Earpiece'}</Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+        <Text style={s.title} accessibilityRole="header">
+          Convo
+        </Text>
+        <Text style={s.sub}>{mode === 'loud' ? 'Tap a phrase. Your phone says it in Spanish.' : 'Tap a phrase to hear it in your ear first.'}</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.chips} style={{ marginHorizontal: -20 }}>
+          {CATEGORIES.map((cat) => {
+            const on = cat.id === activeCat;
+            return (
+              <Pressable
+                key={cat.id}
+                onPress={() => setActiveCat(cat.id)}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: on }}
+                style={[s.chip, on && s.chipOn]}
+              >
+                <Text style={[s.chipTxt, on && s.chipTxtOn]}>{cat.label}</Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      </View>
 
-              {isActive && (
-                <View style={s.phrasesContainer}>
-                  {/* Built-in phrases (with possible overrides) */}
-                  {builtInPhrases.map((original, i) => {
-                    const phrase = getEffectiveBuiltIn(cat.id, i, original);
-                    const isEdited = !!customData.edits[`${cat.id}:${i}`];
-                    return (
-                      <View key={`b-${i}`} style={s.phraseRow}>
-                        <TouchableOpacity
-                          style={s.phraseBtn}
-                          onPress={() => handleSpeak(phrase.es)}
-                          activeOpacity={0.7}
-                        >
-                          <View style={s.phraseTextWrap}>
-                            <Text style={s.phraseLabel}>
-                              {phrase.label}
-                              {isEdited && <Text style={s.editedMark}> •</Text>}
-                            </Text>
-                            <Text style={s.phraseEs}>{phrase.es}</Text>
-                          </View>
-                          <View style={s.phraseActions}>
-                            <TouchableOpacity
-                              style={s.editIconBtn}
-                              onPress={() => openEditBuiltIn(cat.id, i, phrase)}
-                              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                            >
-                              <Text style={s.editIcon}>✏️</Text>
-                            </TouchableOpacity>
-                            <Text style={s.playIcon}>{mode === 'loud' ? '🔊' : '🎧'}</Text>
-                          </View>
-                        </TouchableOpacity>
-                      </View>
-                    );
-                  })}
-
-                  {/* Custom (user-added) phrases */}
-                  {customPhrases.map((phrase, i) => (
-                    <View key={`c-${i}`} style={s.phraseRow}>
-                      <TouchableOpacity
-                        style={[s.phraseBtn, s.phraseBtnCustom]}
-                        onPress={() => handleSpeak(phrase.es)}
-                        activeOpacity={0.7}
-                      >
-                        <View style={s.phraseTextWrap}>
-                          <Text style={s.phraseLabel}>{phrase.label}</Text>
-                          <Text style={s.phraseEs}>{phrase.es}</Text>
-                        </View>
-                        <View style={s.phraseActions}>
-                          <TouchableOpacity
-                            style={s.editIconBtn}
-                            onPress={() => openEditCustom(cat.id, i, phrase)}
-                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                          >
-                            <Text style={s.editIcon}>✏️</Text>
-                          </TouchableOpacity>
-                          <Text style={s.playIcon}>{mode === 'loud' ? '🔊' : '🎧'}</Text>
-                        </View>
-                      </TouchableOpacity>
-                    </View>
-                  ))}
-
-                  {/* Add new phrase button */}
-                  <TouchableOpacity
-                    style={s.addPhraseBtn}
-                    onPress={() => openAddNew(cat.id)}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={s.addPhrasePlus}>＋</Text>
-                    <Text style={s.addPhraseTxt}>Add phrase</Text>
-                  </TouchableOpacity>
+      <View style={s.sheet}>
+        <ScrollView contentContainerStyle={[s.list, { paddingBottom: Math.max(insets.bottom, 12) + 20 }]}>
+          {items.map(({ key, phrase, edit, mine }) => {
+            const on = speaking === phrase.es;
+            return (
+              <Pressable
+                key={key}
+                onPress={() => handleSpeak(phrase.es)}
+                onLongPress={edit}
+                accessibilityRole="button"
+                accessibilityLabel={`Say: ${phrase.label}`}
+                accessibilityHint="Long press to edit"
+                style={({ pressed }) => [s.phrase, on && s.phraseOn, pressed && { opacity: 0.85 }]}
+              >
+                <View style={{ flex: 1, gap: 3 }}>
+                  <Text style={s.phraseEn}>
+                    {phrase.label}
+                    {mine ? <Text style={s.mine}>  · yours</Text> : null}
+                  </Text>
+                  <Text style={s.phraseEs}>{phrase.es}</Text>
                 </View>
-              )}
-            </View>
-          );
-        })}
+                <Pressable onPress={edit} hitSlop={10} accessibilityRole="button" accessibilityLabel={`Edit ${phrase.label}`} style={s.editBtn}>
+                  <PencilIcon size={16} color={C.faint} />
+                </Pressable>
+                <View style={[s.play, on && s.playOn]}>
+                  {on ? (
+                    <View style={s.wave}>
+                      {[12, 20, 14, 8].map((h, i) => (
+                        <View key={i} style={[s.waveBar, { height: h }]} />
+                      ))}
+                    </View>
+                  ) : (
+                    <SpeakerIcon size={22} color={C.green} />
+                  )}
+                </View>
+              </Pressable>
+            );
+          })}
+          <Button label="Add your own phrase" kind="outline" onPress={() => openAddNew(activeCat)} icon={<PlusIcon />} style={{ marginTop: 6, height: 54 }} />
+          <Text style={s.addHint}>Type it in English. We translate it.</Text>
+        </ScrollView>
+      </View>
 
-        <TouchableOpacity style={s.bottomBackBtn} onPress={onBack} activeOpacity={0.7}>
-          <Text style={s.bottomBackTxt}>◀ Back</Text>
-        </TouchableOpacity>
-      </ScrollView>
-
-      {/* ── Edit / Add Modal ── */}
-      <Modal
-        visible={editModalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setEditModalVisible(false)}
-      >
-        <KeyboardAvoidingView
-          style={s.modalOverlay}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        >
-          <ScrollView
-            contentContainerStyle={s.modalScrollContent}
-            keyboardShouldPersistTaps="handled"
-            bounces={false}
-          >
+      {/* ── Edit / Add ── */}
+      <Modal visible={editModalVisible} transparent animationType="fade" onRequestClose={() => setEditModalVisible(false)}>
+        <KeyboardAvoidingView style={s.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+          <ScrollView contentContainerStyle={s.modalScrollContent} keyboardShouldPersistTaps="handled" bounces={false}>
             <View style={s.modalCard}>
-              <Text style={s.modalTitle}>{isNewPhrase ? 'Add Phrase' : 'Edit Phrase'}</Text>
+              <Text style={s.modalTitle}>{isNewPhrase ? 'Add a phrase' : 'Edit phrase'}</Text>
 
               <Text style={s.modalFieldLabel}>English</Text>
               <TextInput
@@ -548,59 +498,58 @@ export default function ConvoScreen({ userSetup, repProfile, onBack }: ConvoScre
                 value={editLabel}
                 onChangeText={setEditLabel}
                 onBlur={handleEnglishBlur}
-                placeholder="Type in English — Spanish auto-translates"
+                placeholder="Type it in English"
+                placeholderTextColor={C.faint}
                 autoCapitalize="sentences"
                 multiline
                 returnKeyType="done"
                 blurOnSubmit
+                accessibilityLabel="English"
               />
 
               <View style={s.spanishRow}>
                 <Text style={s.modalFieldLabel}>Spanish</Text>
-                {isTranslating && (
+                {isTranslating ? (
                   <View style={s.translatingRow}>
-                    <ActivityIndicator size="small" color="#7C5CFC" />
-                    <Text style={s.translatingTxt}>Translating...</Text>
+                    <ActivityIndicator size="small" color={C.green} />
+                    <Text style={s.translatingTxt}>Translating…</Text>
                   </View>
-                )}
+                ) : null}
               </View>
               <TextInput
                 style={[s.modalInput, s.modalInputSpanish]}
                 value={editEs}
                 onChangeText={setEditEs}
-                placeholder="Auto-filled — edit if needed"
+                placeholder="Fills in by itself. Edit if needed."
+                placeholderTextColor={C.faint}
                 autoCapitalize="sentences"
                 multiline
                 returnKeyType="done"
                 blurOnSubmit
+                accessibilityLabel="Spanish"
               />
-              <Text style={s.autoTranslateHint}>
-                ✨ Spanish fills automatically when you type English
-              </Text>
 
               <View style={s.modalBtnRow}>
-                <TouchableOpacity style={s.modalCancelBtn} onPress={() => setEditModalVisible(false)}>
+                <Pressable style={s.modalCancelBtn} onPress={() => setEditModalVisible(false)} accessibilityRole="button">
                   <Text style={s.modalCancelTxt}>Cancel</Text>
-                </TouchableOpacity>
-
-                {!isNewPhrase && editTarget && (
-                  <TouchableOpacity
+                </Pressable>
+                {!isNewPhrase && editTarget ? (
+                  <Pressable
                     style={s.modalDeleteBtn}
                     onPress={editTarget.type === 'custom' ? handleDeletePhrase : handleResetBuiltIn}
+                    accessibilityRole="button"
                   >
-                    <Text style={s.modalDeleteTxt}>
-                      {editTarget.type === 'custom' ? '🗑️' : '↩️'}
-                    </Text>
-                  </TouchableOpacity>
-                )}
-
-                <TouchableOpacity
+                    <Text style={s.modalDeleteTxt}>{editTarget.type === 'custom' ? 'Delete' : 'Reset'}</Text>
+                  </Pressable>
+                ) : null}
+                <Pressable
                   style={[s.modalSaveBtn, isTranslating && { opacity: 0.6 }]}
                   onPress={handleSaveEdit}
                   disabled={isTranslating}
+                  accessibilityRole="button"
                 >
-                  <Text style={s.modalSaveTxt}>{isTranslating ? 'Translating...' : 'Save'}</Text>
-                </TouchableOpacity>
+                  <Text style={s.modalSaveTxt}>{isTranslating ? 'Translating…' : 'Save'}</Text>
+                </Pressable>
               </View>
             </View>
           </ScrollView>
@@ -611,173 +560,50 @@ export default function ConvoScreen({ userSetup, repProfile, onBack }: ConvoScre
 }
 
 const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#F5F6FB' },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12 },
-  title: { fontSize: 18, fontWeight: '700', color: '#1A1B2E' },
-  
-  toggleContainer: { flexDirection: 'row', marginHorizontal: 20, marginTop: 10, backgroundColor: '#E5E7EB', borderRadius: 20, padding: 2 },
-  toggleBtn: { flex: 1, paddingVertical: 12, alignItems: 'center' },
-  toggleActive: { backgroundColor: '#FFFFFF', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, elevation: 2 },
-  toggleTxt: { fontSize: 14, fontWeight: '600', color: '#6B7280' },
-  toggleTxtActive: { color: '#7C5CFC', fontWeight: '700' },
-  
-  modeHint: { textAlign: 'center', color: '#A0A3BD', fontSize: 12, marginTop: 8, marginBottom: 16 },
+  root: { flex: 1, backgroundColor: C.ground },
+  top: { paddingTop: 8, paddingHorizontal: 20, paddingBottom: 18, gap: 8 },
+  topRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
+  toggle: { flexDirection: 'row', height: 40, padding: 3, borderRadius: 20, backgroundColor: C.chip },
+  toggleBtn: { height: 34, paddingHorizontal: 14, borderRadius: 17, justifyContent: 'center' },
+  toggleOn: { backgroundColor: '#FFFFFF' },
+  toggleTxt: { fontSize: 14, fontWeight: '700', color: C.onDark2 },
+  toggleTxtOn: { color: C.ground },
+  title: { fontSize: 30, fontWeight: '800', color: C.onDark, letterSpacing: -0.6 },
+  sub: { fontSize: 16, lineHeight: 22, color: C.onDark2 },
+  chips: { gap: 8, paddingHorizontal: 20, paddingTop: 8 },
+  chip: { height: 40, paddingHorizontal: 16, borderRadius: 20, backgroundColor: C.chip, justifyContent: 'center' },
+  chipOn: { backgroundColor: C.accent },
+  chipTxt: { fontSize: 15, fontWeight: '700', color: C.chipText },
+  chipTxtOn: { color: C.ground },
+  sheet: { flex: 1, backgroundColor: C.sheet, borderTopLeftRadius: 24, borderTopRightRadius: 24 },
+  list: { paddingTop: 20, paddingHorizontal: 18, gap: 10 },
+  phrase: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 14, paddingLeft: 16, paddingRight: 14, borderRadius: 18, borderWidth: 1.5, borderColor: C.line, backgroundColor: '#FFFFFF' },
+  phraseOn: { borderColor: C.green },
+  phraseEn: { fontSize: 17, lineHeight: 22, fontWeight: '700', color: C.ink },
+  mine: { fontSize: 13, fontWeight: '600', color: C.green },
+  phraseEs: { fontSize: 15, lineHeight: 20, color: C.muted },
+  editBtn: { width: 32, height: 44, alignItems: 'center', justifyContent: 'center' },
+  play: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#E7F8F0', alignItems: 'center', justifyContent: 'center' },
+  playOn: { backgroundColor: C.green },
+  wave: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  waveBar: { width: 3, borderRadius: 2, backgroundColor: '#FFFFFF' },
+  addHint: { alignSelf: 'center', fontSize: 14, color: C.muted },
 
-  grid: { paddingHorizontal: 16, paddingBottom: 40 },
-  catWrapper: { marginBottom: 12, backgroundColor: '#FFFFFF', borderRadius: 16, overflow: 'hidden', elevation: 2 },
-  catBtn: { flexDirection: 'row', alignItems: 'center', padding: 16, gap: 12 },
-  catBtnActive: { backgroundColor: '#F5F6FB' },
-  catIcon: { fontSize: 24 },
-  catLabel: { fontSize: 18, fontWeight: '600', color: '#1A1B2E', flex: 1 },
-  catLabelActive: { color: '#7C5CFC' },
-
-  customBadge: { backgroundColor: '#7C5CFC', borderRadius: 10, paddingHorizontal: 7, paddingVertical: 2 },
-  customBadgeTxt: { color: '#FFFFFF', fontSize: 11, fontWeight: '700' },
-
-  phrasesContainer: { padding: 16, paddingTop: 0, gap: 10 },
-  phraseRow: {},
-  phraseBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 12,
-    backgroundColor: '#F9FAFB',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  phraseBtnCustom: {
-    borderColor: '#D4C8FF',
-    backgroundColor: '#FAFAFF',
-  },
-  phraseTextWrap: { flex: 1, marginRight: 8 },
-  phraseLabel: { fontSize: 14, fontWeight: '600', color: '#374151' },
-  phraseEs: { fontSize: 13, color: '#6B7280', fontStyle: 'italic', marginTop: 2 },
-  editedMark: { color: '#7C5CFC', fontWeight: '700' },
-  phraseActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  editIconBtn: { padding: 2 },
-  editIcon: { fontSize: 14, opacity: 0.5 },
-  playIcon: { fontSize: 18 },
-
-  // Add phrase button
-  addPhraseBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 10,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: '#7C5CFC',
-    borderStyle: 'dashed',
-    gap: 6,
-  },
-  addPhrasePlus: { fontSize: 18, color: '#7C5CFC', fontWeight: '700' },
-  addPhraseTxt: { fontSize: 14, color: '#7C5CFC', fontWeight: '600' },
-
-  // Back button at bottom
-  bottomBackBtn: { marginTop: 8, marginBottom: 20, paddingVertical: 16, backgroundColor: '#F0F1F7', borderRadius: 16, alignItems: 'center' },
-  bottomBackTxt: { fontSize: 16, fontWeight: '600', color: '#6B7280' },
-
-  // ── Modal styles ──
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-  },
-  modalScrollContent: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 24,
-  },
-  modalCard: {
-    width: '100%',
-    maxWidth: 400,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 24,
-    elevation: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 12,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#1A1B2E',
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  modalFieldLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#6B7280',
-    marginBottom: 4,
-    marginTop: 8,
-  },
-  modalInput: {
-    backgroundColor: '#F9FAFB',
-    borderRadius: 12,
-    padding: 14,
-    fontSize: 16,
-    color: '#1A1B2E',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    minHeight: 48,
-  },
-  modalInputSpanish: {
-    borderColor: '#D4C8FF',
-    backgroundColor: '#FAFAFF',
-  },
-  spanishRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 8,
-  },
-  translatingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  translatingTxt: {
-    fontSize: 12,
-    color: '#7C5CFC',
-    fontWeight: '600',
-  },
-  autoTranslateHint: {
-    fontSize: 11,
-    color: '#A0A3BD',
-    marginTop: 4,
-    fontStyle: 'italic',
-  },
-  modalBtnRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 20,
-    gap: 10,
-  },
-  modalCancelBtn: {
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-    backgroundColor: '#F0F1F7',
-  },
-  modalCancelTxt: { fontSize: 15, fontWeight: '600', color: '#6B7280' },
-  modalDeleteBtn: {
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    borderRadius: 12,
-    backgroundColor: '#FEF2F2',
-  },
-  modalDeleteTxt: { fontSize: 16 },
-  modalSaveBtn: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 12,
-    backgroundColor: '#7C5CFC',
-    alignItems: 'center',
-  },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
+  modalScrollContent: { flexGrow: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
+  modalCard: { width: '100%', maxWidth: 400, backgroundColor: '#FFFFFF', borderRadius: 22, padding: 22 },
+  modalTitle: { fontSize: 20, fontWeight: '800', color: C.ink, marginBottom: 12 },
+  modalFieldLabel: { fontSize: 14, fontWeight: '600', color: C.ink2, marginBottom: 6, marginTop: 8 },
+  modalInput: { borderRadius: 12, borderWidth: 1.5, borderColor: C.field, paddingHorizontal: 14, paddingVertical: 12, fontSize: 16, color: C.ink, minHeight: 50 },
+  modalInputSpanish: { borderColor: C.greenLine, backgroundColor: C.greenBg },
+  spanishRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 },
+  translatingRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  translatingTxt: { fontSize: 13, color: C.green, fontWeight: '600' },
+  modalBtnRow: { flexDirection: 'row', alignItems: 'center', marginTop: 20, gap: 10 },
+  modalCancelBtn: { height: 48, paddingHorizontal: 18, borderRadius: 24, borderWidth: 1.5, borderColor: C.field, justifyContent: 'center' },
+  modalCancelTxt: { fontSize: 15, fontWeight: '700', color: C.ink },
+  modalDeleteBtn: { height: 48, paddingHorizontal: 16, borderRadius: 24, backgroundColor: '#FEF2F2', justifyContent: 'center' },
+  modalDeleteTxt: { fontSize: 15, fontWeight: '700', color: C.red },
+  modalSaveBtn: { flex: 1, height: 48, borderRadius: 24, backgroundColor: C.ink, alignItems: 'center', justifyContent: 'center' },
   modalSaveTxt: { fontSize: 15, fontWeight: '700', color: '#FFFFFF' },
 });

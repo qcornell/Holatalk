@@ -1,23 +1,13 @@
 /**
- * TeachMeScreen — A friendly step-by-step questionnaire to learn about the rep.
- * Stores personal small-talk data for personalizing conversation phrases.
+ * Teach Me: a few quick questions about the rep, so Convo's small talk sounds like them
+ * ("I'm from Houston", "I have 2 kids too"). Saved on the phone.
  */
-
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  StatusBar,
-  ScrollView,
-  Platform,
-  KeyboardAvoidingView,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StatusBar, StyleSheet, Text, TextInput, View } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { saveRepProfile, DEFAULT_REP_PROFILE } from '../config/storage';
 import type { RepProfile } from '../config/storage';
+import { Button, C, DarkHeader } from '../main/ui';
 
 interface Props {
   existingProfile: RepProfile | null;
@@ -28,337 +18,202 @@ interface Props {
 type Step = 'kids' | 'kidsNames' | 'married' | 'hometown' | 'hobbies' | 'jobDuration' | 'food' | 'team' | 'done';
 
 const STEPS: Step[] = ['kids', 'kidsNames', 'married', 'hometown', 'hobbies', 'jobDuration', 'food', 'team', 'done'];
+const ASKED = STEPS.filter((s) => s !== 'done');
 
 const HOBBY_OPTIONS = [
-  { id: 'fishing', icon: '🎣', label: 'Fishing' },
-  { id: 'video games', icon: '🎮', label: 'Video Games' },
-  { id: 'sports', icon: '⚽', label: 'Sports' },
-  { id: 'cooking', icon: '🍳', label: 'Cooking' },
-  { id: 'music', icon: '🎵', label: 'Music' },
-  { id: 'church', icon: '⛪', label: 'Church' },
-  { id: 'gym', icon: '💪', label: 'Gym' },
-  { id: 'reading', icon: '📚', label: 'Reading' },
-  { id: 'cars', icon: '🚗', label: 'Cars' },
-  { id: 'hunting', icon: '🦌', label: 'Hunting' },
-  { id: 'other', icon: '✨', label: 'Other' },
+  { id: 'fishing', label: 'Fishing' },
+  { id: 'video games', label: 'Video games' },
+  { id: 'sports', label: 'Sports' },
+  { id: 'cooking', label: 'Cooking' },
+  { id: 'music', label: 'Music' },
+  { id: 'church', label: 'Church' },
+  { id: 'gym', label: 'Gym' },
+  { id: 'reading', label: 'Reading' },
+  { id: 'cars', label: 'Cars' },
+  { id: 'hunting', label: 'Hunting' },
+  { id: 'other', label: 'Other' },
 ];
 
+const QUESTIONS: Record<Exclude<Step, 'done'>, { title: string; sub: string }> = {
+  kids: { title: 'How many kids do you have?', sub: 'Families love talking about their kids.' },
+  kidsNames: { title: "What are your kids' names?", sub: 'Optional. It makes small talk more personal.' },
+  married: { title: 'Are you married?', sub: 'Only used for small talk.' },
+  hometown: { title: 'Where are you from?', sub: 'Whatever you usually tell people.' },
+  hobbies: { title: 'What do you do for fun?', sub: 'Pick all that fit.' },
+  jobDuration: { title: 'How long have you been doing this?', sub: 'Customers like hearing you know your stuff.' },
+  food: { title: 'Favorite food?', sub: "A great icebreaker when they're cooking." },
+  team: { title: 'Favorite sports team?', sub: "Optional. Skip it if you're not into sports." },
+};
+
+/** The Convo line a step's answer gives you, in English and Spanish. */
+function preview(step: Step, p: RepProfile): { en: string; es: string } | null {
+  switch (step) {
+    case 'kids':
+      if (p.kidsCount <= 0) return null;
+      return p.kidsCount === 1
+        ? { en: 'I have a kid too.', es: 'Yo también tengo un hijo.' }
+        : { en: `I have ${p.kidsCount} kids too.`, es: `Yo también tengo ${p.kidsCount} hijos.` };
+    case 'kidsNames':
+      return p.kidsNames.trim() ? { en: `My kids are ${p.kidsNames.trim()}.`, es: `Mis hijos se llaman ${p.kidsNames.trim()}.` } : null;
+    case 'hometown':
+      return p.hometown.trim() ? { en: `I'm from ${p.hometown.trim()}.`, es: `Yo soy de ${p.hometown.trim()}.` } : null;
+    case 'hobbies':
+      if (p.hobbies.includes('fishing')) return { en: 'I love to fish!', es: '¡A mí me encanta pescar!' };
+      if (p.hobbies.includes('cooking')) return { en: 'I love cooking.', es: 'Me encanta cocinar.' };
+      if (p.hobbies.includes('sports')) return { en: 'I play sports too.', es: 'Yo también juego deportes.' };
+      if (p.hobbies.includes('gym')) return { en: 'I go to the gym.', es: 'Yo voy al gimnasio.' };
+      if (p.hobbies.includes('church')) return { en: 'I go to church.', es: 'Yo voy a la iglesia.' };
+      return null;
+    case 'food':
+      return p.favoriteFood.trim() ? { en: `I love ${p.favoriteFood.trim()}.`, es: `A mí me encanta ${p.favoriteFood.trim()}.` } : null;
+    case 'team':
+      return p.favoriteTeam.trim() ? { en: `I'm a ${p.favoriteTeam.trim()} fan!`, es: `¡Soy fan de ${p.favoriteTeam.trim()}!` } : null;
+    default:
+      return null;
+  }
+}
+
 export default function TeachMeScreen({ existingProfile, onComplete, onBack }: Props) {
+  const insets = useSafeAreaInsets();
   const [step, setStep] = useState<Step>('kids');
-  const [profile, setProfile] = useState<RepProfile>(
-    existingProfile ? { ...DEFAULT_REP_PROFILE, ...existingProfile } : { ...DEFAULT_REP_PROFILE }
-  );
-
+  const [profile, setProfile] = useState<RepProfile>(existingProfile ? { ...DEFAULT_REP_PROFILE, ...existingProfile } : { ...DEFAULT_REP_PROFILE });
   const stepIndex = STEPS.indexOf(step);
-
-  const update = (partial: Partial<RepProfile>) => setProfile(prev => ({ ...prev, ...partial }));
+  const update = (partial: Partial<RepProfile>) => setProfile((prev) => ({ ...prev, ...partial }));
 
   const goNext = () => {
-    // Skip kidsNames if no kids
-    if (step === 'kids' && profile.kidsCount === 0) {
-      setStep('married');
-      return;
-    }
-    if (stepIndex < STEPS.length - 1) {
-      setStep(STEPS[stepIndex + 1]);
-    }
+    if (step === 'kids' && profile.kidsCount === 0) return setStep('married');
+    if (stepIndex < STEPS.length - 1) setStep(STEPS[stepIndex + 1]);
   };
-
   const goBack = () => {
-    if (step === 'married' && profile.kidsCount === 0) {
-      setStep('kids');
-      return;
-    }
-    if (stepIndex > 0) {
-      setStep(STEPS[stepIndex - 1]);
-    }
+    if (stepIndex === 0) return onBack();
+    if (step === 'married' && profile.kidsCount === 0) return setStep('kids');
+    setStep(STEPS[stepIndex - 1]);
   };
-
   const handleFinish = async () => {
     await saveRepProfile(profile);
     onComplete(profile);
   };
+  const toggleHobby = (id: string) =>
+    update({ hobbies: profile.hobbies.includes(id) ? profile.hobbies.filter((h) => h !== id) : [...profile.hobbies, id] });
 
-  const toggleHobby = (hobbyId: string) => {
-    const hobbies = profile.hobbies.includes(hobbyId)
-      ? profile.hobbies.filter(h => h !== hobbyId)
-      : [...profile.hobbies, hobbyId];
-    update({ hobbies });
-  };
+  const n = step === 'done' ? ASKED.length : ASKED.indexOf(step) + 1;
+  const q = step === 'done' ? { title: 'Nice, now Convo knows you', sub: 'Your lines are in Convo. Come back any time to change them.' } : QUESTIONS[step];
+  const line = preview(step, profile);
 
-  // Progress dots (exclude 'done' from visible dots)
-  const visibleSteps = STEPS.filter(s => s !== 'done');
-  const progressIndex = step === 'done' ? visibleSteps.length : visibleSteps.indexOf(step);
+  const input = (value: string, onChange: (t: string) => void, label: string, placeholder: string, words = false) => (
+    <View style={{ gap: 6 }}>
+      <Text style={st.label}>{label}</Text>
+      <TextInput
+        style={st.input}
+        value={value}
+        onChangeText={onChange}
+        placeholder={placeholder}
+        placeholderTextColor={C.faint}
+        autoCapitalize={words ? 'words' : 'sentences'}
+        accessibilityLabel={label}
+        returnKeyType="next"
+        onSubmitEditing={goNext}
+      />
+    </View>
+  );
+  const pill = (on: boolean, label: string, onPress: () => void, key?: string) => (
+    <Pressable key={key ?? label} onPress={onPress} accessibilityRole="button" accessibilityState={{ selected: on }} style={[st.pill, on && st.pillOn]}>
+      <Text style={[st.pillText, on && st.pillTextOn]}>{label}</Text>
+    </Pressable>
+  );
 
   return (
-    <SafeAreaView style={s.root}>
-      <StatusBar barStyle="dark-content" backgroundColor="#F5F6FB" />
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-        <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
-
-          {/* Header */}
-          <View style={s.header}>
-            <Text style={s.headerEmoji}>🧑</Text>
-            <Text style={s.headerTitle}>Let me get to know you!</Text>
-            <Text style={s.headerSub}>This helps me personalize conversations for you.</Text>
-            {/* Progress dots */}
-            <View style={s.progressRow}>
-              {visibleSteps.map((_, i) => (
-                <View key={i} style={[s.dot, i <= progressIndex && s.dotActive]} />
-              ))}
-            </View>
-          </View>
-
-          {/* ── Step: Kids Count ── */}
-          {step === 'kids' && (
-            <View style={s.section}>
-              <Text style={s.question}>👶 How many kids do you have?</Text>
-              <Text style={s.hint}>Tap a number — this helps with small talk!</Text>
-              <View style={s.numberRow}>
-                {[0, 1, 2, 3, 4, 5].map(n => (
-                  <TouchableOpacity
-                    key={n}
-                    style={[s.numberBtn, profile.kidsCount === n && s.numberBtnActive]}
-                    onPress={() => update({ kidsCount: n })}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={[s.numberTxt, profile.kidsCount === n && s.numberTxtActive]}>
-                      {n === 0 ? 'None' : n === 5 ? '5+' : String(n)}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-          )}
-
-          {/* ── Step: Kids Names ── */}
-          {step === 'kidsNames' && (
-            <View style={s.section}>
-              <Text style={s.question}>👧👦 What are your kids' names?</Text>
-              <Text style={s.hint}>Optional — helps make convo more personal.</Text>
-              <TextInput
-                style={s.input}
-                placeholder="e.g. Sofia, Diego"
-                value={profile.kidsNames}
-                onChangeText={t => update({ kidsNames: t })}
-                autoCapitalize="words"
-              />
-            </View>
-          )}
-
-          {/* ── Step: Married ── */}
-          {step === 'married' && (
-            <View style={s.section}>
-              <Text style={s.question}>💍 Are you married?</Text>
-              <View style={s.choiceCol}>
-                {[
-                  { value: 'married' as const, label: '💑 Yes, married', emoji: '' },
-                  { value: 'single' as const, label: '🙂 Nope, single', emoji: '' },
-                  { value: 'complicated' as const, label: "🤷 It's complicated", emoji: '' },
-                ].map(opt => (
-                  <TouchableOpacity
-                    key={opt.value}
-                    style={[s.choiceBtn, profile.maritalStatus === opt.value && s.choiceBtnActive]}
-                    onPress={() => update({ maritalStatus: opt.value })}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={[s.choiceTxt, profile.maritalStatus === opt.value && s.choiceTxtActive]}>{opt.label}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-              {profile.maritalStatus === 'married' && (
-                <View style={{ marginTop: 16 }}>
-                  <Text style={s.hint}>How long have you been married?</Text>
-                  <TextInput
-                    style={s.input}
-                    placeholder="e.g. 5 years"
-                    value={profile.marriedDuration}
-                    onChangeText={t => update({ marriedDuration: t })}
-                  />
+    <SafeAreaView style={st.root} edges={['top', 'left', 'right']}>
+      <StatusBar barStyle="light-content" />
+      <DarkHeader onBack={goBack} progress={{ step: n, of: ASKED.length }} kicker={step === 'done' ? 'Teach Me · done' : `Teach Me · ${n} of ${ASKED.length}`} title={q.title} sub={q.sub} />
+      <View style={st.sheet}>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <ScrollView contentContainerStyle={st.body} keyboardShouldPersistTaps="handled">
+            {step === 'kids' ? (
+              <View style={st.pills}>{[0, 1, 2, 3, 4, 5].map((k) => pill(profile.kidsCount === k, k === 0 ? 'None' : k === 5 ? '5+' : String(k), () => update({ kidsCount: k }), String(k)))}</View>
+            ) : null}
+            {step === 'kidsNames' ? input(profile.kidsNames, (t) => update({ kidsNames: t }), 'Names', 'Sofia, Diego', true) : null}
+            {step === 'married' ? (
+              <>
+                <View style={st.pills}>
+                  {pill(profile.maritalStatus === 'married', 'Yes, married', () => update({ maritalStatus: 'married' }))}
+                  {pill(profile.maritalStatus === 'single', 'Single', () => update({ maritalStatus: 'single' }))}
+                  {pill(profile.maritalStatus === 'complicated', "It's complicated", () => update({ maritalStatus: 'complicated' }))}
                 </View>
-              )}
-            </View>
-          )}
+                {profile.maritalStatus === 'married' ? input(profile.marriedDuration, (t) => update({ marriedDuration: t }), 'For how long?', '5 years') : null}
+              </>
+            ) : null}
+            {step === 'hometown' ? input(profile.hometown, (t) => update({ hometown: t }), 'Hometown', 'Houston, Texas', true) : null}
+            {step === 'hobbies' ? (
+              <>
+                <View style={st.pills}>{HOBBY_OPTIONS.map((h) => pill(profile.hobbies.includes(h.id), h.label, () => toggleHobby(h.id), h.id))}</View>
+                {profile.hobbies.includes('other') ? input(profile.otherHobby, (t) => update({ otherHobby: t }), 'What else?', 'Photography, bowling') : null}
+              </>
+            ) : null}
+            {step === 'jobDuration' ? input(profile.jobDuration, (t) => update({ jobDuration: t }), 'How long', '2 years') : null}
+            {step === 'food' ? input(profile.favoriteFood, (t) => update({ favoriteFood: t }), 'Favorite food', 'Tacos') : null}
+            {step === 'team' ? input(profile.favoriteTeam, (t) => update({ favoriteTeam: t }), 'Team', 'Dallas Cowboys', true) : null}
 
-          {/* ── Step: Hometown ── */}
-          {step === 'hometown' && (
-            <View style={s.section}>
-              <Text style={s.question}>📍 Where are you from?</Text>
-              <Text style={s.hint}>City, state — whatever you usually tell people.</Text>
-              <TextInput
-                style={s.input}
-                placeholder="e.g. Houston, Texas"
-                value={profile.hometown}
-                onChangeText={t => update({ hometown: t })}
-                autoCapitalize="words"
-              />
-            </View>
-          )}
-
-          {/* ── Step: Hobbies ── */}
-          {step === 'hobbies' && (
-            <View style={s.section}>
-              <Text style={s.question}>🎯 What are your hobbies?</Text>
-              <Text style={s.hint}>Pick all that apply — we'll use these in convo!</Text>
-              <View style={s.hobbyGrid}>
-                {HOBBY_OPTIONS.map(h => (
-                  <TouchableOpacity
-                    key={h.id}
-                    style={[s.hobbyBtn, profile.hobbies.includes(h.id) && s.hobbyBtnActive]}
-                    onPress={() => toggleHobby(h.id)}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={s.hobbyIcon}>{h.icon}</Text>
-                    <Text style={[s.hobbyLabel, profile.hobbies.includes(h.id) && s.hobbyLabelActive]}>{h.label}</Text>
-                  </TouchableOpacity>
-                ))}
+            {line ? (
+              <View style={st.preview} accessibilityLabel={`In Convo you'll have: ${line.en}`}>
+                <Text style={st.previewKicker}>In Convo you'll have</Text>
+                <Text style={st.previewEn}>{line.en}</Text>
+                <Text style={st.previewEs}>{line.es}</Text>
               </View>
-              {profile.hobbies.includes('other') && (
-                <View style={{ marginTop: 16 }}>
-                  <Text style={s.hint}>What else do you enjoy?</Text>
-                  <TextInput
-                    style={s.input}
-                    placeholder="e.g. photography, bowling, traveling"
-                    value={profile.otherHobby}
-                    onChangeText={t => update({ otherHobby: t })}
-                  />
-                </View>
-              )}
-            </View>
-          )}
+            ) : null}
 
-          {/* ── Step: Job Duration ── */}
-          {step === 'jobDuration' && (
-            <View style={s.section}>
-              <Text style={s.question}>💼 How long you been doing this?</Text>
-              <Text style={s.hint}>Customers love hearing you're experienced.</Text>
-              <TextInput
-                style={s.input}
-                placeholder="e.g. 2 years"
-                value={profile.jobDuration}
-                onChangeText={t => update({ jobDuration: t })}
-              />
-            </View>
-          )}
-
-          {/* ── Step: Favorite Food ── */}
-          {step === 'food' && (
-            <View style={s.section}>
-              <Text style={s.question}>🍽️ Favorite food?</Text>
-              <Text style={s.hint}>Great icebreaker when they're cooking!</Text>
-              <TextInput
-                style={s.input}
-                placeholder="e.g. tacos, pizza, BBQ"
-                value={profile.favoriteFood}
-                onChangeText={t => update({ favoriteFood: t })}
-              />
-            </View>
-          )}
-
-          {/* ── Step: Favorite Team ── */}
-          {step === 'team' && (
-            <View style={s.section}>
-              <Text style={s.question}>🏆 Favorite sports team?</Text>
-              <Text style={s.hint}>Optional — skip if you're not into sports.</Text>
-              <TextInput
-                style={s.input}
-                placeholder="e.g. Dallas Cowboys"
-                value={profile.favoriteTeam}
-                onChangeText={t => update({ favoriteTeam: t })}
-                autoCapitalize="words"
-              />
-            </View>
-          )}
-
-          {/* ── Step: Done ── */}
-          {step === 'done' && (
-            <View style={s.section}>
-              <Text style={s.doneEmoji}>🎉</Text>
-              <Text style={s.doneTitle}>Nice, I know you now!</Text>
-              <Text style={s.doneSub}>I'll use this to personalize your convos. You can update anytime.</Text>
-
-              <View style={s.summaryCard}>
-                {profile.kidsCount > 0 && <Text style={s.summaryLine}>👶 {profile.kidsCount} kid{profile.kidsCount > 1 ? 's' : ''}{profile.kidsNames ? ` (${profile.kidsNames})` : ''}</Text>}
-                {profile.maritalStatus ? <Text style={s.summaryLine}>💍 {profile.maritalStatus === 'married' ? `Married${profile.marriedDuration ? ` (${profile.marriedDuration})` : ''}` : profile.maritalStatus === 'single' ? 'Single' : "It's complicated"}</Text> : null}
-                {profile.hometown ? <Text style={s.summaryLine}>📍 From {profile.hometown}</Text> : null}
-                {profile.hobbies.length > 0 && <Text style={s.summaryLine}>🎯 {profile.hobbies.map(h => h === 'other' && profile.otherHobby ? profile.otherHobby : h).join(', ')}</Text>}
-                {profile.jobDuration ? <Text style={s.summaryLine}>💼 {profile.jobDuration} in the game</Text> : null}
-                {profile.favoriteFood ? <Text style={s.summaryLine}>🍽️ Loves {profile.favoriteFood}</Text> : null}
-                {profile.favoriteTeam ? <Text style={s.summaryLine}>🏆 {profile.favoriteTeam} fan</Text> : null}
-              </View>
-            </View>
-          )}
-
-          {/* Navigation */}
-          <View style={s.navRow}>
-            <TouchableOpacity style={s.backBtn} onPress={stepIndex === 0 ? onBack : goBack} activeOpacity={0.7}>
-              <Text style={s.backBtnTxt}>{stepIndex === 0 ? '◀ Back' : '← Back'}</Text>
-            </TouchableOpacity>
             {step === 'done' ? (
-              <TouchableOpacity style={s.finishBtn} onPress={handleFinish} activeOpacity={0.7}>
-                <Text style={s.finishBtnTxt}>✅ Done!</Text>
-              </TouchableOpacity>
+              <View style={st.summary}>
+                {[
+                  profile.kidsCount > 0 ? `${profile.kidsCount} kid${profile.kidsCount > 1 ? 's' : ''}${profile.kidsNames ? ` (${profile.kidsNames})` : ''}` : '',
+                  profile.maritalStatus === 'married' ? `Married${profile.marriedDuration ? `, ${profile.marriedDuration}` : ''}` : profile.maritalStatus === 'single' ? 'Single' : '',
+                  profile.hometown ? `From ${profile.hometown}` : '',
+                  profile.hobbies.length ? profile.hobbies.map((h) => (h === 'other' && profile.otherHobby ? profile.otherHobby : h)).join(', ') : '',
+                  profile.jobDuration ? `${profile.jobDuration} doing this` : '',
+                  profile.favoriteFood ? `Loves ${profile.favoriteFood}` : '',
+                  profile.favoriteTeam ? `${profile.favoriteTeam} fan` : '',
+                ]
+                  .filter(Boolean)
+                  .map((t) => (
+                    <Text key={t} style={st.summaryLine}>
+                      {t}
+                    </Text>
+                  ))}
+              </View>
+            ) : null}
+          </ScrollView>
+          <View style={[st.footer, { paddingBottom: Math.max(insets.bottom, 12) + 8 }]}>
+            {step === 'done' ? (
+              <Button label="Done" kind="accent" onPress={handleFinish} />
             ) : (
-              <TouchableOpacity style={s.nextBtn} onPress={goNext} activeOpacity={0.7}>
-                <Text style={s.nextBtnTxt}>Next →</Text>
-              </TouchableOpacity>
+              <>
+                <Button label="Next" onPress={goNext} />
+                <Button label="Skip this one" kind="text" onPress={goNext} />
+              </>
             )}
           </View>
-
-        </ScrollView>
-      </KeyboardAvoidingView>
+        </KeyboardAvoidingView>
+      </View>
     </SafeAreaView>
   );
 }
 
-const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#F5F6FB' },
-  scroll: { paddingHorizontal: 20, paddingBottom: 120 },
-
-  header: { alignItems: 'center', paddingTop: 12, marginBottom: 20 },
-  headerEmoji: { fontSize: 40, marginBottom: 6 },
-  headerTitle: { fontSize: 22, fontWeight: '700', color: '#1A1B2E', textAlign: 'center' },
-  headerSub: { fontSize: 14, color: '#6B7280', marginTop: 4, textAlign: 'center' },
-  progressRow: { flexDirection: 'row', marginTop: 16 },
-  dot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#D4D6E4', marginHorizontal: 4 },
-  dotActive: { backgroundColor: '#7C5CFC' },
-
-  section: { marginBottom: 24 },
-  question: { fontSize: 20, fontWeight: '700', color: '#1A1B2E', marginBottom: 4 },
-  hint: { fontSize: 14, color: '#9CA3AF', marginBottom: 16, lineHeight: 20 },
-
-  input: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, fontSize: 18, color: '#1A1B2E', elevation: 2, borderWidth: 1, borderColor: '#E5E7EB' },
-
-  numberRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  numberBtn: { paddingVertical: 16, paddingHorizontal: 22, backgroundColor: '#FFFFFF', borderRadius: 16, elevation: 2, borderWidth: 2, borderColor: '#E5E7EB', minWidth: 70, alignItems: 'center' },
-  numberBtnActive: { backgroundColor: '#7C5CFC', borderColor: '#7C5CFC' },
-  numberTxt: { fontSize: 18, fontWeight: '700', color: '#374151' },
-  numberTxtActive: { color: '#FFFFFF' },
-
-  choiceCol: { gap: 10 },
-  choiceBtn: { paddingVertical: 18, paddingHorizontal: 20, backgroundColor: '#FFFFFF', borderRadius: 16, elevation: 2, borderWidth: 2, borderColor: '#E5E7EB' },
-  choiceBtnActive: { backgroundColor: '#7C5CFC', borderColor: '#7C5CFC' },
-  choiceTxt: { fontSize: 18, fontWeight: '600', color: '#374151', textAlign: 'center' },
-  choiceTxtActive: { color: '#FFFFFF' },
-
-  hobbyGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  hobbyBtn: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 14, backgroundColor: '#FFFFFF', borderRadius: 16, elevation: 2, borderWidth: 2, borderColor: '#E5E7EB', gap: 6 },
-  hobbyBtnActive: { backgroundColor: '#7C5CFC', borderColor: '#7C5CFC' },
-  hobbyIcon: { fontSize: 20 },
-  hobbyLabel: { fontSize: 15, fontWeight: '600', color: '#374151' },
-  hobbyLabelActive: { color: '#FFFFFF' },
-
-  doneEmoji: { fontSize: 56, textAlign: 'center', marginBottom: 12 },
-  doneTitle: { fontSize: 24, fontWeight: '700', color: '#1A1B2E', textAlign: 'center' },
-  doneSub: { fontSize: 14, color: '#6B7280', textAlign: 'center', marginTop: 6, marginBottom: 20 },
-  summaryCard: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 20, elevation: 2, gap: 8 },
-  summaryLine: { fontSize: 16, color: '#374151', lineHeight: 24 },
-
-  navRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8, gap: 12 },
-  backBtn: { flex: 1, paddingVertical: 16, backgroundColor: '#F0F1F7', borderRadius: 16, alignItems: 'center' },
-  backBtnTxt: { fontSize: 16, fontWeight: '600', color: '#6B7280' },
-  nextBtn: { flex: 2, paddingVertical: 16, backgroundColor: '#7C5CFC', borderRadius: 16, alignItems: 'center', elevation: 4 },
-  nextBtnTxt: { fontSize: 16, fontWeight: '700', color: '#FFFFFF' },
-  finishBtn: { flex: 2, paddingVertical: 16, backgroundColor: '#10B981', borderRadius: 16, alignItems: 'center', elevation: 4 },
-  finishBtnTxt: { fontSize: 16, fontWeight: '700', color: '#FFFFFF' },
+const st = StyleSheet.create({
+  root: { flex: 1, backgroundColor: C.ground },
+  sheet: { flex: 1, backgroundColor: C.sheet, borderTopLeftRadius: 24, borderTopRightRadius: 24 },
+  body: { paddingTop: 22, paddingHorizontal: 20, paddingBottom: 24, gap: 16 },
+  label: { fontSize: 14, fontWeight: '600', color: C.ink2 },
+  input: { minHeight: 54, borderRadius: 14, borderWidth: 1.5, borderColor: C.field, backgroundColor: '#FFFFFF', paddingHorizontal: 16, fontSize: 18, color: C.ink },
+  pills: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  pill: { minHeight: 48, minWidth: 64, paddingHorizontal: 18, borderRadius: 24, borderWidth: 2, borderColor: C.line, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
+  pillOn: { borderColor: C.green, backgroundColor: C.greenBg },
+  pillText: { fontSize: 16, fontWeight: '700', color: C.ink2 },
+  pillTextOn: { color: C.green },
+  preview: { backgroundColor: C.greenBg, borderWidth: 1, borderColor: C.greenLine, borderRadius: 18, paddingVertical: 14, paddingHorizontal: 16, gap: 3 },
+  previewKicker: { fontSize: 13, fontWeight: '600', color: C.green },
+  previewEn: { fontSize: 17, fontWeight: '700', color: C.ink },
+  previewEs: { fontSize: 15, color: C.ink2 },
+  summary: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: C.line, borderRadius: 18, padding: 18, gap: 8 },
+  summaryLine: { fontSize: 16, lineHeight: 22, color: C.ink2 },
+  footer: { paddingHorizontal: 20, paddingTop: 10, backgroundColor: C.sheet, gap: 2 },
 });

@@ -1,29 +1,22 @@
 /**
- * PaywallScreen — Shown when user has no active subscription.
- * Clean, friendly design that works on all iPhone sizes (including 13 mini).
- * 
- * Features:
- * - Product info from App Store (price, trial)
- * - Subscribe button (starts free trial → auto-renews)
- * - Restore purchases button
- * - Terms/Privacy links
- * - Apple-required subscription disclosure
+ * The paywall, after setup: Ana is ready, start the free week. Price and trial come from the App
+ * Store; Restore, Terms, Privacy and Apple's renewal wording are all here, as Apple requires.
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
-  TouchableOpacity,
+  Image,
+  Pressable,
   StyleSheet,
   StatusBar,
   ActivityIndicator,
   Alert,
   Linking,
   ScrollView,
-  Dimensions,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   connectStore,
   getProduct,
@@ -31,15 +24,20 @@ import {
   restorePurchases,
 } from '../subscription';
 import type { SubscriptionProduct } from '../subscription';
+import { CheckIcon } from '../teammate/icons';
+import { Button, C } from '../main/ui';
+import { PRIVACY_URL, TERMS_URL } from '../main/SettingsScreen';
 
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
-const isSmallScreen = SCREEN_HEIGHT < 700; // iPhone SE, 13 mini
+const ANA = require('../../assets/teammate/ana.png');
 
 interface PaywallScreenProps {
   onSubscribed: () => void;
+  /** The assistant's name from setup */
+  assistantName?: string;
 }
 
-export default function PaywallScreen({ onSubscribed }: PaywallScreenProps) {
+export default function PaywallScreen({ onSubscribed, assistantName = 'Ana' }: PaywallScreenProps) {
+  const insets = useSafeAreaInsets();
   const [product, setProduct] = useState<SubscriptionProduct | null>(null);
   const [loading, setLoading] = useState(true);
   const [purchasing, setPurchasing] = useState(false);
@@ -79,7 +77,7 @@ export default function PaywallScreen({ onSubscribed }: PaywallScreenProps) {
       setPurchasing(false);
       Alert.alert(
         "Apple didn't respond",
-        'Please try again. If you already started your trial, tap Restore Purchase.',
+        'Please try again. If you already started your free week, tap Restore purchase.',
       );
     }, 90000);
     try {
@@ -119,321 +117,97 @@ export default function PaywallScreen({ onSubscribed }: PaywallScreenProps) {
     }
   }, [restoring, onSubscribed]);
 
-  const openTerms = () => Linking.openURL('https://sites.google.com/view/holad2dtranslator/terms');
-  const openPrivacy = () => Linking.openURL('https://sites.google.com/view/holad2dtranslator/home');
+  const openTerms = () => Linking.openURL(TERMS_URL);
+  const openPrivacy = () => Linking.openURL(PRIVACY_URL);
 
   if (loading) {
     return (
       <SafeAreaView style={s.root}>
-        <StatusBar barStyle="dark-content" backgroundColor="#F5F6FB" />
+        <StatusBar barStyle="light-content" />
         <View style={s.loadingWrap}>
-          <ActivityIndicator size="large" color="#7C5CFC" />
-          <Text style={s.loadingText}>Loading...</Text>
+          <ActivityIndicator size="large" color={C.accent} />
         </View>
       </SafeAreaView>
     );
   }
 
-  const priceText = product?.price || '$4.99/month';
+  // "$4.99/month" from the store; the words around it say "a month" already
+  const price = (product?.price || '$4.99').replace(/\s*\/\s*(month|mo)\.?$/i, '');
+  const perks = [
+    `${assistantName} on speakerphone at every Spanish-speaking door`,
+    'Your prices only. She never makes up an offer.',
+    'Live English captions of the whole conversation',
+    'Convo and Teach Me for inside the house',
+  ];
 
   return (
-    <SafeAreaView style={s.root}>
-      <StatusBar barStyle="dark-content" backgroundColor="#F5F6FB" />
-      <ScrollView
-        contentContainerStyle={s.scrollContent}
-        showsVerticalScrollIndicator={false}
-        bounces={false}
-      >
-        {/* Hero */}
-        <View style={s.heroSection}>
-          <Text style={s.heroEmoji}>👋</Text>
-          <Text style={s.heroTitle}>Hola D2D</Text>
-          <Text style={s.heroSubtitle}>Your door-to-door sales assistant</Text>
-        </View>
-
-        {/* Features */}
-        <View style={s.featuresCard}>
-          <Text style={s.featuresTitle}>Everything you need</Text>
-          
-          <FeatureRow icon="🎤" label="Real-Time Translation" desc="Spanish ↔ English on-device speech recognition" />
-          <View style={s.featureDivider} />
-          <FeatureRow icon="🗣️" label="Guided Conversations" desc="AI-powered sales coaching with objection handling" />
-          <View style={s.featureDivider} />
-          <FeatureRow icon="📱" label="Works Offline" desc="No internet needed for speech recognition" />
-          <View style={s.featureDivider} />
-          <FeatureRow icon="🎧" label="Bluetooth Ready" desc="Works with smart glasses and earpieces" />
-        </View>
-
-        {/* Pricing */}
-        <View style={s.pricingCard}>
-          <View style={s.trialBadge}>
-            <Text style={s.trialBadgeText}>1 WEEK FREE TRIAL</Text>
+    <SafeAreaView style={s.root} edges={['top', 'left', 'right']}>
+      <StatusBar barStyle="light-content" />
+      <ScrollView contentContainerStyle={[s.scroll, { paddingBottom: Math.max(insets.bottom, 12) + 16 }]} bounces={false}>
+        <View style={s.avatarWrap}>
+          <Image source={ANA} style={s.avatar} accessibilityLabel={assistantName} />
+          <View style={s.avatarTick}>
+            <CheckIcon size={16} color={C.ground} />
           </View>
-          <Text style={s.priceMain}>{priceText}</Text>
-          <Text style={s.priceSub}>after free trial · cancel anytime</Text>
         </View>
-
-        {/* Subscribe Button */}
-        <TouchableOpacity
-          style={[s.subscribeBtn, purchasing && s.subscribeBtnDisabled]}
-          onPress={handleSubscribe}
-          activeOpacity={0.85}
-          disabled={purchasing}
-        >
-          {purchasing ? (
-            <ActivityIndicator color="#FFFFFF" size="small" />
-          ) : (
-            <Text style={s.subscribeBtnText}>Start Free Trial</Text>
-          )}
-        </TouchableOpacity>
-
-        {/* Restore */}
-        <TouchableOpacity
-          style={s.restoreBtn}
-          onPress={handleRestore}
-          activeOpacity={0.7}
-          disabled={restoring}
-        >
-          {restoring ? (
-            <ActivityIndicator color="#7C5CFC" size="small" />
-          ) : (
-            <Text style={s.restoreBtnText}>Restore Purchase</Text>
-          )}
-        </TouchableOpacity>
-
-        {/* Legal */}
-        <View style={s.legalRow}>
-          <TouchableOpacity onPress={openTerms} activeOpacity={0.7}>
-            <Text style={s.legalLink}>Terms of Use</Text>
-          </TouchableOpacity>
-          <Text style={s.legalDot}>·</Text>
-          <TouchableOpacity onPress={openPrivacy} activeOpacity={0.7}>
-            <Text style={s.legalLink}>Privacy Policy</Text>
-          </TouchableOpacity>
-        </View>
-
-        <Text style={s.legalDisclaimer}>
-          Payment will be charged to your Apple ID account at the confirmation of purchase.
-          Subscription automatically renews unless it is canceled at least 24 hours before the
-          end of the current period. Your account will be charged for renewal within 24 hours
-          prior to the end of the current period. You can manage and cancel your subscriptions
-          by going to your App Store account settings after purchase.
+        <Text style={s.title} accessibilityRole="header">
+          {assistantName}'s ready for your first door
         </Text>
+        <Text style={s.sub}>Try everything free for a week.</Text>
+
+        <View style={s.perks}>
+          {perks.map((p) => (
+            <View key={p} style={s.perk}>
+              <CheckIcon size={22} color={C.accent} />
+              <Text style={s.perkText}>{p}</Text>
+            </View>
+          ))}
+        </View>
+
+        <View style={{ flex: 1, minHeight: 24 }} />
+        <View style={s.priceBlock}>
+          <Text style={s.priceMain}>1 week free</Text>
+          <Text style={s.priceSub}>then {price} a month · cancel anytime</Text>
+        </View>
+        <Button label="Start my free week" kind="accent" onPress={handleSubscribe} busy={purchasing} style={{ height: 60, borderRadius: 30 }} />
+        <Pressable onPress={handleRestore} disabled={restoring} accessibilityRole="button" style={s.restore}>
+          {restoring ? <ActivityIndicator color="#FFFFFF" /> : <Text style={s.restoreText}>Restore purchase</Text>}
+        </Pressable>
+        <Text style={s.legal}>
+          After the free week, {price} a month is charged to your Apple ID. It renews monthly unless you cancel at least 24 hours
+          before the period ends. Manage or cancel any time in your App Store account settings.
+        </Text>
+        <View style={s.legalRow}>
+          <Pressable onPress={openTerms} hitSlop={8} accessibilityRole="link">
+            <Text style={s.legalLink}>Terms of Use</Text>
+          </Pressable>
+          <Pressable onPress={openPrivacy} hitSlop={8} accessibilityRole="link">
+            <Text style={s.legalLink}>Privacy Policy</Text>
+          </Pressable>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-/* Feature row component for cleaner JSX */
-function FeatureRow({ icon, label, desc }: { icon: string; label: string; desc: string }) {
-  return (
-    <View style={s.featureRow}>
-      <Text style={s.featureIcon}>{icon}</Text>
-      <View style={s.featureTextWrap}>
-        <Text style={s.featureLabel}>{label}</Text>
-        <Text style={s.featureDesc}>{desc}</Text>
-      </View>
-    </View>
-  );
-}
-
 const s = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: '#F5F6FB',
-  },
-  scrollContent: {
-    paddingHorizontal: 20,
-    paddingBottom: 40,
-    flexGrow: 1,
-  },
-  loadingWrap: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 12,
-  },
-  loadingText: {
-    fontSize: 16,
-    color: '#A0A3BD',
-    fontWeight: '500',
-  },
-
-  // Hero
-  heroSection: {
-    alignItems: 'center',
-    paddingTop: isSmallScreen ? 12 : 28,
-    marginBottom: isSmallScreen ? 14 : 22,
-  },
-  heroEmoji: {
-    fontSize: isSmallScreen ? 44 : 56,
-    marginBottom: 6,
-  },
-  heroTitle: {
-    fontSize: isSmallScreen ? 26 : 32,
-    fontWeight: '800',
-    color: '#1A1B2E',
-    letterSpacing: -0.5,
-  },
-  heroSubtitle: {
-    fontSize: isSmallScreen ? 13 : 15,
-    color: '#6B7280',
-    marginTop: 4,
-    fontWeight: '500',
-  },
-
-  // Features card
-  featuresCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: isSmallScreen ? 14 : 18,
-    marginBottom: isSmallScreen ? 10 : 14,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-  },
-  featuresTitle: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#7C5CFC',
-    letterSpacing: 2,
-    textTransform: 'uppercase',
-    marginBottom: isSmallScreen ? 10 : 14,
-    textAlign: 'center',
-  },
-  featureRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingVertical: isSmallScreen ? 5 : 7,
-  },
-  featureIcon: {
-    fontSize: isSmallScreen ? 20 : 24,
-    width: 32,
-    textAlign: 'center',
-  },
-  featureTextWrap: {
-    flex: 1,
-  },
-  featureLabel: {
-    fontSize: isSmallScreen ? 14 : 15,
-    fontWeight: '700',
-    color: '#1A1B2E',
-  },
-  featureDesc: {
-    fontSize: isSmallScreen ? 11 : 12,
-    color: '#6B7280',
-    marginTop: 1,
-    lineHeight: isSmallScreen ? 15 : 17,
-  },
-  featureDivider: {
-    height: 1,
-    backgroundColor: '#F0F1F7',
-    marginVertical: 2,
-  },
-
-  // Pricing card
-  pricingCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: isSmallScreen ? 14 : 18,
-    marginBottom: isSmallScreen ? 14 : 18,
-    alignItems: 'center',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    borderWidth: 2,
-    borderColor: '#7C5CFC',
-  },
-  trialBadge: {
-    backgroundColor: '#10B981',
-    paddingHorizontal: 14,
-    paddingVertical: 5,
-    borderRadius: 20,
-    marginBottom: 10,
-  },
-  trialBadgeText: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 1.5,
-  },
-  priceMain: {
-    fontSize: isSmallScreen ? 26 : 32,
-    fontWeight: '800',
-    color: '#1A1B2E',
-  },
-  priceSub: {
-    fontSize: 13,
-    color: '#6B7280',
-    marginTop: 3,
-    fontWeight: '500',
-  },
-
-  // Subscribe button
-  subscribeBtn: {
-    backgroundColor: '#7C5CFC',
-    borderRadius: 16,
-    paddingVertical: isSmallScreen ? 15 : 17,
-    alignItems: 'center',
-    justifyContent: 'center',
-    elevation: 6,
-    shadowColor: '#7C5CFC',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    marginBottom: 10,
-  },
-  subscribeBtnDisabled: {
-    opacity: 0.7,
-  },
-  subscribeBtnText: {
-    fontSize: 17,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    letterSpacing: 0.5,
-  },
-
-  // Restore button
-  restoreBtn: {
-    paddingVertical: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 14,
-  },
-  restoreBtnText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#7C5CFC',
-  },
-
-  // Legal
-  legalRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 10,
-  },
-  legalLink: {
-    fontSize: 12,
-    color: '#7C5CFC',
-    fontWeight: '500',
-    textDecorationLine: 'underline',
-  },
-  legalDot: {
-    fontSize: 12,
-    color: '#A0A3BD',
-  },
-  legalDisclaimer: {
-    fontSize: 10,
-    color: '#A0A3BD',
-    textAlign: 'center',
-    lineHeight: 15,
-    paddingHorizontal: 4,
-  },
+  root: { flex: 1, backgroundColor: C.ground },
+  loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  scroll: { flexGrow: 1, paddingTop: 36, paddingHorizontal: 22 },
+  avatarWrap: { alignSelf: 'center', width: 96, height: 96 },
+  avatar: { width: 96, height: 96, borderRadius: 48 },
+  avatarTick: { position: 'absolute', right: -2, bottom: -2, width: 34, height: 34, borderRadius: 17, borderWidth: 3, borderColor: C.ground, backgroundColor: C.accent, alignItems: 'center', justifyContent: 'center' },
+  title: { marginTop: 20, fontSize: 32, lineHeight: 36, fontWeight: '800', color: C.onDark, letterSpacing: -0.6, textAlign: 'center' },
+  sub: { marginTop: 10, fontSize: 17, lineHeight: 24, color: C.onDark2, textAlign: 'center' },
+  perks: { marginTop: 26, backgroundColor: '#111114', borderWidth: 1, borderColor: '#26262B', borderRadius: 20, padding: 18, gap: 14 },
+  perk: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
+  perkText: { flex: 1, fontSize: 16, lineHeight: 22, color: C.chipText },
+  priceBlock: { alignItems: 'center', gap: 2, marginBottom: 14 },
+  priceMain: { fontSize: 20, fontWeight: '800', color: C.onDark },
+  priceSub: { fontSize: 15, color: C.onDark2 },
+  restore: { marginTop: 6, height: 44, alignItems: 'center', justifyContent: 'center' },
+  restoreText: { fontSize: 15, fontWeight: '600', color: C.onDark },
+  legal: { marginTop: 6, fontSize: 12, lineHeight: 17, color: C.onDark3, textAlign: 'center' },
+  legalRow: { marginTop: 10, flexDirection: 'row', justifyContent: 'center', gap: 22 },
+  legalLink: { fontSize: 13, color: C.onDark2, textDecorationLine: 'underline' },
 });

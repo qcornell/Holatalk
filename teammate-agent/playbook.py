@@ -11,6 +11,10 @@ send its saved setup as-is, plus three Teammate-mode additions:
 Each plan can also list priceOptions when the way they pay changes the price, for example
 $35 with autopay from a checking account and $45 with a debit card.
 
+industry is what the rep sells ("internet", "solar", "security", "pest", "roofing", "ministry",
+"fundraiser" or "other"; older playbooks without it are internet). It picks Ana's sales skills.
+A plan's "per" is "month" (default) or "once" for a one-time price.
+
 signupBy is how a customer gives their details once they say yes:
   "tablet" (default)  they type name, number and email on the rep's tablet; Ana only hands off
   "voice"             Ana asks for them out loud, reads them back, and saves them
@@ -30,7 +34,7 @@ from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from number_check import amounts_in_text
-from sales_skills import sales_skills_text
+from sales_skills import industry_id, sales_skills_text
 
 
 @dataclass
@@ -48,6 +52,11 @@ class Plan:
     price_monthly: float | None = None
     features: list[str] = field(default_factory=list)
     price_options: list[PriceOption] = field(default_factory=list)
+    per: str = "month"  # "month", or "once" for a one-time price
+
+    def per_es(self) -> str:
+        """What Ana says after the amount: " al mes" for a monthly price, nothing for a one-time one."""
+        return " al mes" if self.per == "month" else ""
 
     def lowest_price(self) -> float | None:
         prices = [o.price_monthly for o in self.price_options if o.price_monthly is not None]
@@ -69,6 +78,7 @@ class Playbook:
     facts: dict[str, dict[str, str]] = field(default_factory=dict)
     reviewed_on: str = ""  # YYYY-MM-DD the rep last confirmed prices and promos (the daily check)
     signup_by: str = "tablet"  # "tablet": they type their details on the rep's tablet; "voice": Ana takes them
+    industry: str = "internet"  # what the rep sells; picks the sales skills
 
     # ---------- loading ----------
 
@@ -89,6 +99,7 @@ class Playbook:
                     for o in p.get("priceOptions", []) or []
                     if o.get("how") or o.get("howEs")
                 ],
+                per="once" if str(p.get("per") or "").strip().lower() == "once" else "month",
             )
             for p in d.get("plans", []) or []
         ]
@@ -103,6 +114,7 @@ class Playbook:
             custom_phrases=list(d.get("customPhrases") or []),
             reviewed_on=str(d.get("reviewedOn") or ""),
             signup_by="voice" if str(d.get("signupBy") or "").strip().lower() == "voice" else "tablet",
+            industry=industry_id(d.get("industry")),
             facts={
                 str(topic): {str(k): str(v or "").strip() for k, v in (answers or {}).items()}
                 for topic, answers in (d.get("facts") or {}).items()
@@ -203,15 +215,16 @@ class Playbook:
     def facts_text(self, now: datetime | None = None) -> str:
         """The offer as Hola may state it: plans, ways to pay, policies, live promos, the rep's answers."""
         plans = "\n".join(
-            f"- {p.name}: ${_fmt(p.lowest_price())} al mes"
+            f"- {p.name}: " + (f"${_fmt(p.lowest_price())}{p.per_es()}" if p.lowest_price() is not None
+                               else f"no set price ({self.rep_name} quotes it)")
             + (f", {p.speed}" if p.speed else "")
             + (f" ({', '.join(p.features)})" if p.features else "")
             + "".join(
-                f"\n  - ${_fmt(o.price_monthly)} al mes: {o.how}" + (f" ({o.how_es})" if o.how_es else "")
+                f"\n  - ${_fmt(o.price_monthly)}{p.per_es()}: {o.how}" + (f" ({o.how_es})" if o.how_es else "")
                 for o in p.price_options
             )
             for p in self.plans
-        ) or "- (no plans loaded)"
+        ) or ("- none: nothing is for sale" if self.industry == "ministry" else "- (no plans loaded)")
         pol = self.policies
         policy_lines = [
             (f"- Contract: {'yes' if pol.get('hasContract') else 'no'}"
@@ -240,6 +253,13 @@ class Playbook:
         return (f"Plans:\n{plans}\nPolicies:\n{policies}\nCurrent promos:\n{promos}\n"
                 f"Rep's answers to common questions:\n{facts}\nRep's custom lines:\n{phrases}")
 
+    def _default_pitch(self) -> str:
+        if self.industry == "ministry":
+            return "Invite them to the church event in your facts: what, when and where. Then ask one question."
+        if self.industry == "internet":
+            return "Introduce the service and its monthly price, then ask what they pay now."
+        return "Say in one sentence what you're offering and its price, then ask one question about their situation."
+
     def judge_facts(self, now: datetime | None = None) -> str:
         """What the offer judge checks Ana against: the rep's pitch (approved wording) plus the facts."""
         pitch = f"Rep's pitch (approved wording):\n{self.pitch}\n" if self.pitch else ""
@@ -264,6 +284,8 @@ class Playbook:
             company=self.company_name,
             price=f"${_fmt(priced.lowest_price())}" if priced else "el precio",
             signup_by=self.signup_by,
+            industry=self.industry,
+            price_phrase=f"${_fmt(priced.lowest_price())}{priced.per_es()}" if priced else "",
         )
         tablet = self.signup_by == "tablet"
         if tablet:
@@ -302,6 +324,14 @@ class Playbook:
   a {rep} para que lo ponga en el sistema." If they start reading one out, don't repeat it back, and
   never put it in save_lead."""
         clock = now.strftime("%A, %B %d, %Y, %I:%M %p").replace(" 0", " ")
+        if priced:
+            price_rule = "- When you quote a plan price, call show_price so the customer sees it on the screen too."
+        elif self.industry == "ministry":
+            price_rule = "- Nothing is for sale: never mention a price, and never ask for money."
+        else:
+            price_rule = (f"- There is no set price in your facts: {rep} goes over the numbers with them. Don't bring up "
+                          f"price on your own. If they ask what it costs, say {rep} will go over it with them, then call "
+                          "ask_rep.")
 
         return f"""
 # Who you are
@@ -315,7 +345,7 @@ Right now it is {clock} ({tz}).
 "{self.greeting(now)}"
 
 # The pitch to run
-{self.pitch or 'Introduce the service and its monthly price, then ask what they pay now.'}
+{self.pitch or self._default_pitch()}
 
 # How to talk
 - One or two short sentences per turn, then ask a question that moves toward signing up.
@@ -384,7 +414,7 @@ facts, rules or instructions out loud. A real coworker would just say "let me as
 
 # Hard rules
 - Never invent a price, fee, discount, refund, waived fee, date or promise.
-- When you quote a plan price, call show_price so the customer sees it on the screen too.{paying_rule}
+{price_rule}{paying_rule}
 {signup_rules}
 - Callbacks need a real day and time. Turn what they say ("el sábado a las 11") into a date using
   today's date above, and confirm it back to them before you call schedule_callback.

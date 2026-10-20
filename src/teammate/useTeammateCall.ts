@@ -31,6 +31,14 @@ export interface PriceCard {
   monthly: number;
   options: { how: string; howEs: string; monthly: number }[];
   chosen?: string;
+  /** "month" or "once" (a one-time price) */
+  per?: 'month' | 'once';
+}
+
+/** How a call went, for the day's counts on the home screen. */
+export interface CallResult {
+  signedUp: boolean;
+  seconds: number;
 }
 
 /** Why Ana wants you right now. */
@@ -148,7 +156,7 @@ export function useTeammateCall(settings: TeammateSettings) {
           break;
         }
         case 'price_card':
-          patch({ price: { plan: msg.plan, monthly: msg.monthly, options: msg.options ?? [], chosen: msg.chosen } });
+          patch({ price: { plan: msg.plan, monthly: msg.monthly, options: msg.options ?? [], chosen: msg.chosen, per: msg.per === 'once' ? 'once' : 'month' } });
           break;
         case 'calling_rep': // "Quentin, are you there?"
           buzz();

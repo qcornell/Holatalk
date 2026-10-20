@@ -18,9 +18,10 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useKeepAwake } from 'expo-keep-awake';
 import type { TeammateSettings } from './settings';
-import { money } from './settings';
+import { money, pricePer } from './settings';
+import { industry } from './industries';
 import { useTeammateCall } from './useTeammateCall';
-import type { AnaNeeds, Caption, CallState, PriceCard } from './useTeammateCall';
+import type { AnaNeeds, Caption, CallResult, CallState, PriceCard } from './useTeammateCall';
 import {
   CheckIcon,
   ChevronDownIcon,
@@ -82,22 +83,24 @@ function PriceView({ price, settings }: { price: PriceCard; settings: TeammateSe
   const main = options.find((o) => o.how === price.chosen) ?? options.reduce((a, b) => (b.monthly < a.monthly ? b : a));
   const others = options.filter((o) => o !== main);
   const cap = (s: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
+  const pack = industry(settings.industry);
+  const monthly = (price.per ?? pack.per) === 'month';
   return (
     <View style={st.priceCard}>
-      <Text style={st.priceKicker}>{price.plan || 'Internet'} para su casa</Text>
+      <Text style={st.priceKicker}>{settings.industry === 'internet' ? `${price.plan || 'Internet'} para su casa` : price.plan || pack.planName}</Text>
       <View style={st.priceRow}>
         <Text style={st.priceBig}>{money(main.monthly)}</Text>
-        <Text style={st.pricePer}>al mes</Text>
+        {monthly ? <Text style={st.pricePer}>al mes</Text> : null}
       </View>
       {main.howEs ? <Text style={st.priceHow}>{main.howEs.replace(/, con número de cuenta y de ruta$/, '')}</Text> : null}
       <View style={st.priceDivider} />
-      {settings.installationFee === 0 ? (
+      {pack.hasInstall && settings.installationFee === 0 ? (
         <View style={st.priceFeature}>
           <CheckIcon size={22} color="#0B7A54" />
           <Text style={st.priceFeatureText}>Instalación gratis</Text>
         </View>
       ) : null}
-      {!settings.hasContract ? (
+      {pack.hasInstall && !settings.hasContract ? (
         <View style={st.priceFeature}>
           <CheckIcon size={22} color="#0B7A54" />
           <Text style={st.priceFeatureText}>Sin contrato</Text>
@@ -108,7 +111,7 @@ function PriceView({ price, settings }: { price: PriceCard; settings: TeammateSe
           <Text style={st.priceOtherHow}>{cap(o.howEs || o.how)}</Text>
           <View style={{ flex: 1 }} />
           <Text style={st.priceOtherAmt}>{money(o.monthly)}</Text>
-          <Text style={st.priceOtherPer}> al mes</Text>
+          {monthly ? <Text style={st.priceOtherPer}> al mes</Text> : null}
         </View>
       ))}
     </View>
@@ -324,7 +327,7 @@ function Row({ label, value, done }: { label: string; value: string; done?: bool
 }
 
 /* ── after the call ── */
-function Ended({ state, settings, onNext }: { state: CallState; settings: TeammateSettings; onNext: () => void }) {
+function Ended({ state, settings, onNext }: { state: CallState; settings: TeammateSettings; onNext: (r: CallResult) => void }) {
   const pop = useRef(new Animated.Value(0.6)).current;
   useEffect(() => {
     Animated.spring(pop, { toValue: 1, friction: 5, useNativeDriver: true }).start();
@@ -342,15 +345,15 @@ function Ended({ state, settings, onNext }: { state: CallState; settings: Teamma
       </Text>
       {won && state.signup ? (
         <View style={st.endedCard}>
-          <Text style={st.endedPlan}>{state.signup.plan || 'Internet'}</Text>
+          <Text style={st.endedPlan}>{state.signup.plan || settings.plans[0]?.name || 'Signed up'}</Text>
           <Row label="Details" value={settings.signupBy === 'tablet' ? 'On your tablet' : 'Saved'} done />
           <Row label="Pays with" value={state.signup.payment || 'Not chosen yet'} done={!!state.signup.payment} />
           {state.signup.monthly ? (
             <View style={{ flexDirection: 'row', alignItems: 'baseline', marginTop: 6 }}>
-              <Text style={st.rowLabel}>Monthly</Text>
+              <Text style={st.rowLabel}>{pricePer(settings) === 'month' ? 'Monthly' : 'Price'}</Text>
               <View style={{ flex: 1 }} />
               <Text style={st.endedPrice}>{money(state.signup.monthly)}</Text>
-              <Text style={st.rowLabel}> /mo</Text>
+              {pricePer(settings) === 'month' ? <Text style={st.rowLabel}> /mo</Text> : null}
             </View>
           ) : null}
         </View>
@@ -359,7 +362,7 @@ function Ended({ state, settings, onNext }: { state: CallState; settings: Teamma
         {clock(state.seconds)} on the call{state.costUsd != null ? ` · about $${state.costUsd.toFixed(2)}` : ` · ~${minutes} min`}
       </Text>
       <View style={{ flex: 1 }} />
-      <Pressable onPress={onNext} style={({ pressed }) => [st.nextBtn, pressed && { opacity: 0.85 }]}>
+      <Pressable onPress={() => onNext({ signedUp: won, seconds: state.seconds })} style={({ pressed }) => [st.nextBtn, pressed && { opacity: 0.85 }]}>
         <Text style={st.nextText}>Next door</Text>
         <ChevronRightIcon />
       </Pressable>
@@ -373,7 +376,7 @@ export default function TeammateCallScreen({
   onRetry,
 }: {
   settings: TeammateSettings;
-  onDone: () => void;
+  onDone: (r?: CallResult) => void;
   onRetry: () => void;
 }) {
   useKeepAwake();
@@ -397,13 +400,15 @@ export default function TeammateCallScreen({
 
   const fallbackPrice: PriceCard | null = useMemo(() => {
     const plan = settings.plans[0];
-    if (!plan) return null;
+    const options = (plan?.priceOptions ?? []).filter((o) => o.priceMonthly > 0);
+    if (!plan || (!options.length && !(plan.priceMonthly > 0))) return null; // nothing priced: no price card
     return {
       plan: plan.name,
-      monthly: plan.priceMonthly,
-      options: plan.priceOptions.map((o) => ({ how: o.how, howEs: o.howEs, monthly: o.priceMonthly })),
+      monthly: options.length ? Math.min(...options.map((o) => o.priceMonthly)) : plan.priceMonthly,
+      options: options.map((o) => ({ how: o.how, howEs: o.howEs, monthly: o.priceMonthly })),
+      per: pricePer(settings) === 'once' ? 'once' : 'month',
     };
-  }, [settings.plans]);
+  }, [settings]);
   const price = state.price ?? fallbackPrice;
 
   if (state.phase === 'ended') {
@@ -426,7 +431,7 @@ export default function TeammateCallScreen({
           <Pressable onPress={onRetry} style={({ pressed }) => [st.nextBtn, pressed && { opacity: 0.85 }]}>
             <Text style={st.nextText}>Try again</Text>
           </Pressable>
-          <Pressable onPress={onDone} style={st.secondaryBtn}>
+          <Pressable onPress={() => onDone()} style={st.secondaryBtn}>
             <Text style={st.secondaryText}>Back</Text>
           </Pressable>
         </View>

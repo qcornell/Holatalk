@@ -105,3 +105,144 @@ export const BackIcon = ({ size = 22, color = '#FFFFFF' }: P) => (
     <Path d="M11 6.5L5.5 12l5.5 5.5" />
   </Svg>
 );
+
+export const ChevronIcon = ({ size = 18, color = '#A8A29E', dir = 'right' }: P & { dir?: 'left' | 'right' }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" {...line(color, 2.4)}>
+    <Path d={dir === 'right' ? 'M9 5l7 7-7 7' : 'M15 5l-7 7 7 7'} />
+  </Svg>
+);
+
+export const GearIcon = ({ size = 21, color = '#FFFFFF' }: P) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" {...line(color, 1.9)}>
+    <Circle cx={12} cy={12} r={3} />
+    <Path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" />
+  </Svg>
+);
+
+export const ChatIcon = ({ size = 22, color = '#0B7A54' }: P) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" {...line(color, 2)}>
+    <Path d="M4 5.5h11a1.5 1.5 0 0 1 1.5 1.5v6a1.5 1.5 0 0 1-1.5 1.5H9l-3.5 3v-3H4A1.5 1.5 0 0 1 2.5 13V7A1.5 1.5 0 0 1 4 5.5z" />
+    <Path d="M19.5 9.5H20a1.5 1.5 0 0 1 1.5 1.5v6a1.5 1.5 0 0 1-1.5 1.5h-1.5v3L15 18.5h-4" />
+  </Svg>
+);
+
+export const PersonIcon = ({ size = 22, color = '#1D4ED8' }: P) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" {...line(color, 2)}>
+    <Circle cx={12} cy={8} r={3.5} />
+    <Path d="M5 20a7 7 0 0 1 14 0" />
+  </Svg>
+);
+
+export const ListIcon = ({ size = 20, color = '#57534E' }: P) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" {...line(color, 2)}>
+    <Path d="M9 6.5h11M9 12h11M9 17.5h11" />
+    <Path d="M4.5 6.5h.01M4.5 12h.01M4.5 17.5h.01" />
+  </Svg>
+);
+
+export const CardIcon = ({ size = 20, color = '#57534E' }: P) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" {...line(color, 2)}>
+    <Rect x={2.5} y={5.5} width={19} height={13} rx={2} />
+    <Path d="M2.5 10h19" />
+  </Svg>
+);
+
+export const HelpIcon = ({ size = 20, color = '#57534E' }: P) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" {...line(color, 2)}>
+    <Circle cx={12} cy={12} r={9.5} />
+    <Path d="M9.6 9.3a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.2-2.4 3.6" />
+    <Path d="M12 17h.01" />
+  </Svg>
+);
+
+export const LinkIcon = ({ size = 20, color = '#57534E' }: P) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" {...line(color, 2)}>
+    <Path d="M10 14a4.5 4.5 0 0 0 6.4 0l3-3a4.5 4.5 0 0 0-6.4-6.4l-1 1" />
+    <Path d="M14 10a4.5 4.5 0 0 0-6.4 0l-3 3a4.5 4.5 0 0 0 6.4 6.4l1-1" />
+  </Svg>
+);
+
+export const PencilIcon = ({ size = 18, color = '#0B7A54' }: P) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" {...line(color, 2)}>
+    <Path d="M4 20h4L19 9l-4-4L4 16z" />
+    <Path d="M13.5 6.5l4 4" />
+  </Svg>
+);
+
+/** One line icon per industry, as on the "What do you sell?" screen. */
+export const IndustryIcon = ({ id, size = 26, color }: P & { id: string }) => {
+  const c = color ?? INDUSTRY_COLORS[id] ?? '#3F3F46';
+  const l = line(c, 2);
+  switch (id) {
+    case 'internet':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24" {...l}>
+          <Path d="M2.5 9a14 14 0 0 1 19 0" />
+          <Path d="M5.5 12.5a9.5 9.5 0 0 1 13 0" />
+          <Path d="M8.7 16a5 5 0 0 1 6.6 0" />
+          <Path d="M12 19.5h.01" />
+        </Svg>
+      );
+    case 'solar':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24" {...l}>
+          <Circle cx={12} cy={12} r={4} />
+          <Path d="M12 2.5v2M12 19.5v2M4.6 4.6L6 6M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4L6 18M18 6l1.4-1.4" />
+        </Svg>
+      );
+    case 'security':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24" {...l}>
+          <Path d="M12 3l7.5 3v5.5c0 4.6-3.2 8.3-7.5 9.5-4.3-1.2-7.5-4.9-7.5-9.5V6z" />
+        </Svg>
+      );
+    case 'pest':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24" {...l}>
+          <Rect x={7.5} y={8} width={9} height={12} rx={4.5} />
+          <Path d="M9.5 8a2.5 2.5 0 0 1 5 0" />
+          <Path d="M3.5 13h4M16.5 13h4M4.5 8.5l3 2M19.5 8.5l-3 2M4.5 18.5l3-2M19.5 18.5l-3-2" />
+        </Svg>
+      );
+    case 'roofing':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24" {...l}>
+          <Path d="M3 11.5L12 4l9 7.5" />
+          <Path d="M5.5 9.5V20h13V9.5" />
+          <Path d="M10 20v-5.5h4V20" />
+        </Svg>
+      );
+    case 'ministry':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24" {...l}>
+          <Path d="M12 2.5v5M9.5 5h5" />
+          <Path d="M5 21v-8l7-5.5 7 5.5v8z" />
+          <Path d="M10 21v-4a2 2 0 0 1 4 0v4" />
+        </Svg>
+      );
+    case 'fundraiser':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24" {...l}>
+          <Path d="M12 20s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7a4.3 4.3 0 0 1 7.5 2.8C19.5 15.4 12 20 12 20z" />
+        </Svg>
+      );
+    default:
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24" {...l}>
+          <Circle cx={12} cy={12} r={9} />
+          <Path d="M12 8v8M8 12h8" />
+        </Svg>
+      );
+  }
+};
+
+const INDUSTRY_COLORS: Record<string, string> = {
+  internet: '#0B7A54',
+  solar: '#B45309',
+  security: '#1D4ED8',
+  pest: '#7C2D12',
+  roofing: '#57534E',
+  ministry: '#6D28D9',
+  fundraiser: '#BE185D',
+  other: '#3F3F46',
+};

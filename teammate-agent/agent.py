@@ -227,8 +227,10 @@ class TeammateAgent(Agent):
                  user_id: str = "local", store=store_lead):
         super().__init__(instructions=playbook.instructions(tz=TIMEZONE))
         # one way to sign up: they type it on the rep's tablet, or Ana takes it out loud
-        skip = "save_lead" if playbook.signup_by == "tablet" else "ready_to_sign_up"
-        self._tools = [t for t in self._tools if getattr(getattr(t, "info", None), "name", "") != skip]
+        skip = {"save_lead" if playbook.signup_by == "tablet" else "ready_to_sign_up"}
+        if not any(p.lowest_price() is not None for p in playbook.plans):
+            skip.add("show_price")  # nothing priced (an invitation, or the rep quotes it): no price card
+        self._tools = [t for t in self._tools if getattr(getattr(t, "info", None), "name", "") not in skip]
         self.playbook = playbook
         self.phone = phone
         self.call_id = call_id
@@ -362,22 +364,24 @@ class TeammateAgent(Agent):
             await self.phone.send("ask_rep", question=f"Price for plan '{plan_name}'?")
             return f"That plan is not in the facts. Tell the customer you'll confirm with {rep}."
         options = [{"how": o.how, "howEs": o.how_es, "monthly": o.price_monthly} for o in plan.price_options]
-        ways = "; ".join(f"${o['monthly']:g} al mes {o['howEs'] or o['how']}" for o in options)
+        per = plan.per_es()
+        ways = "; ".join(f"${o['monthly']:g}{per} {o['howEs'] or o['how']}" for o in options)
         if payment.strip() and plan.price_options:
             chosen = self.playbook.find_price_option(plan, payment)
             if not chosen:
                 return (f"'{payment}' is not one of the ways to pay in your facts. Tell the customer the ways "
                         f"there are ({ways}). If they want '{payment}', call ask_rep.")
             await self.phone.send("price_card", plan=plan.name, monthly=chosen.price_monthly, speed=plan.speed,
-                                  features=plan.features, options=options, chosen=chosen.how)
-            return (f"{plan.name}, {chosen.how_es or chosen.how}: ${chosen.price_monthly:g} al mes. "
+                                  features=plan.features, options=options, chosen=chosen.how, per=plan.per)
+            return (f"{plan.name}, {chosen.how_es or chosen.how}: ${chosen.price_monthly:g}{per}. "
                     "Say exactly this price for this way to pay. Shown on screen.")
         await self.phone.send(
-            "price_card", plan=plan.name, monthly=price, speed=plan.speed, features=plan.features, options=options
+            "price_card", plan=plan.name, monthly=price, speed=plan.speed, features=plan.features, options=options,
+            per=plan.per,
         )
         if len(options) > 1:
             return f"{plan.name}: {ways}. Shown on screen."
-        return f"{plan.name}: ${price:g} al mes. Shown on screen."
+        return f"{plan.name}: ${price:g}{per}. Shown on screen."
 
     @function_tool
     async def ready_to_sign_up(self, context: RunContext, plan: str = "", payment: str = "") -> str:
