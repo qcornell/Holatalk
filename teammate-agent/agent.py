@@ -414,7 +414,8 @@ class TeammateAgent(Agent):
              f"{rep} will hand you the tablet so you can type in your full name, number and email."),
             "say in English: \"They're in! Can you hand them the tablet for their name, number and email?\" "
             f"Then, while they type, stay quiet; help if they ask something. When {rep} asks you to have them enter "
-            "something else (date of birth, Social Security number, ID), tell them to type it on the tablet. If "
+            "something else (date of birth, Social Security number, ID), say it only to the customer, in Spanish, "
+            "with no reply to him (\"Ahora ponga su fecha de nacimiento en la tableta, por favor.\"). If "
             "they tell you how they'll pay, call ready_to_sign_up again with it.")
 
     @function_tool
