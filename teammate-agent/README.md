@@ -74,7 +74,7 @@ Messages arrive on the LiveKit data channel, topic `hola`, as JSON:
 | `callback` | a spouse, roommate or owner must decide | `status`, `name`, `phone`, `when` (as said), `at` (date and time), `decision_maker` |
 | `review_prices` | the playbook wasn't checked today (the daily price check) | `reviewed_on` |
 | `move_on` | no real need, a firm no, or a stall | `reason` |
-| `ended` | after 30 s of silence or the time limit | `reason`, `seconds`, `cost_usd` |
+| `ended` | after 30 s of silence (3 min once they've said yes and may be typing on your tablet) or the time limit | `reason`, `seconds`, `cost_usd` |
 | `hello` | Ana just joined and wants the playbook (repeats each second until it comes) | none |
 
 What the phone sends, same topic:

@@ -69,6 +69,8 @@ VOICE = os.getenv("VOICE", "marin")
 CAPTION_MODEL = os.getenv("CAPTION_MODEL", "gpt-4o-mini")
 TRANSCRIBE_MODEL = os.getenv("TRANSCRIBE_MODEL", "gpt-transcribe")
 SILENCE_SECONDS = float(os.getenv("SILENCE_SECONDS", "30"))
+# after they say yes, they may type on the tablet in silence for a while; wait this long before hanging up
+SIGNED_UP_SILENCE_SECONDS = float(os.getenv("SIGNED_UP_SILENCE_SECONDS", "180"))
 REP_WAIT_SECONDS = float(os.getenv("REP_WAIT_SECONDS", "10"))  # after "Quentin, are you there?": then "Quentin?" once, then carries on
 REP_TALK_SECONDS = float(os.getenv("REP_TALK_SECONDS", "25"))  # once he answers her, his English counts as him this long
 MAX_MINUTES = float(os.getenv("MAX_MINUTES", "20"))
@@ -803,10 +805,24 @@ async def entrypoint(ctx: JobContext) -> None:
         session.shutdown()
         ctx.shutdown(reason=reason)
 
+    quiet = {"since": 0.0}
+
+    async def end_if_still_quiet(since: float) -> None:
+        await asyncio.sleep(max(0.0, SIGNED_UP_SILENCE_SECONDS - SILENCE_SECONDS))
+        if quiet["since"] == since:  # nobody spoke again
+            await end("silence")
+
     @session.on("user_state_changed")
     def _on_user_state(ev) -> None:
-        if ev.new_state == "away":  # nobody has spoken for SILENCE_SECONDS
+        if ev.new_state != "away":  # someone is talking again
+            quiet["since"] = 0.0
+            return
+        # nobody has spoken for SILENCE_SECONDS
+        if not agent.lead:
             spawn(end("silence"))
+            return
+        quiet["since"] = time.monotonic()  # signed up: they may be typing on the tablet
+        spawn(end_if_still_quiet(quiet["since"]))
 
     async def time_limit() -> None:
         await asyncio.sleep(MAX_MINUTES * 60)
