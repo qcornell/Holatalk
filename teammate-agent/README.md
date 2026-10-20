@@ -36,11 +36,13 @@ Use headphones for this test, so Hola doesn't hear itself through your speakers.
    Hola greets you in Spanish. Play the customer in Spanish, ask about price, install and autopay,
    then speak English as the rep ("tell her install is Saturday"). Try a wrong price on purpose
    ("¿no era $30?") to see the price check work. Each sign-up you finish is added to `leads.jsonl`.
-6. Try the check-in: as the customer, say yes and give a name, number and email. Ana says
-   "Un momentito, déjeme hablar con Quentin", then "Quentin, are you there?" and waits. Say "yeah"
-   and she asks if there's anything else. Answer as the rep, for example "ask if they have a Social
-   Security number or a passport", "explain it's $35 with autopay from checking or $45 with debit",
-   or "no, that's it, thank you". Stay quiet once to hear her say "Quentin?" and then carry on.
+6. Try the sign-up: as the customer, say yes. Ana tells them you'll hand them the tablet for their
+   name, number and email, then "Quentin, are you there?" and waits. Say "yeah" and she asks you to
+   hand them the tablet. Then, as the rep, try "ask her to enter her date of birth" or "have her put
+   her Social": she tells the customer in Spanish to type it on the tablet, never out loud. Stay
+   quiet once to hear her say "Quentin?" and then carry on.
+   No tablet? Set `"signupBy": "voice"` in the playbook and Ana takes the name, number and email out
+   loud, reads them back, and won't save until the customer says yes.
 
 ## Compare gpt-realtime-2.1 and GPT-Live-1
 
@@ -63,7 +65,8 @@ Messages arrive on the LiveKit data channel, topic `hola`, as JSON:
 | `caption` | after every line | `who` (customer, rep, hola), `text`, `en`, `verified` (true when it was surely the rep) |
 | `price_card` | when Hola quotes a plan | `plan`, `monthly`, `speed`, `features`, `options` (`how`, `howEs`, `monthly`), `chosen` (the way to pay quoted, if one) |
 | `lead` | after the details are confirmed and the save finished, and again if the payment choice changes | `status` (saved or not_saved), `fields`: name, phone, email, plan, payment, monthly (blank until they choose how to pay) |
-| `check_in` | right after the first `lead`: Ana is asking you "anything else?" | `reason` |
+| `signup_ready` | they said yes: hand them the tablet (tablet mode; again if the payment choice changes) | `plan`, `payment`, `monthly` |
+| `check_in` | right after the first `lead`: Ana is asking you "anything else?" (voice mode) | `reason` |
 | `ask_rep` | when the playbook has no answer (Ana also asks you out loud) | `question` |
 | `calling_rep` | Ana just said "Quentin, are you there?" because she needs you (buzz the phone) | none |
 | `rep_nudge` | you didn't answer for 10 s after "are you there?", so she said your name again (buzz again) | none |

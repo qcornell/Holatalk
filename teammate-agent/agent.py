@@ -221,6 +221,9 @@ class TeammateAgent(Agent):
     def __init__(self, playbook: Playbook, phone: PhoneBridge, *, call_id: str = "console",
                  user_id: str = "local", store=store_lead):
         super().__init__(instructions=playbook.instructions(tz=TIMEZONE))
+        # one way to sign up: they type it on the rep's tablet, or Ana takes it out loud
+        skip = "save_lead" if playbook.signup_by == "tablet" else "ready_to_sign_up"
+        self._tools = [t for t in self._tools if getattr(getattr(t, "info", None), "name", "") != skip]
         self.playbook = playbook
         self.phone = phone
         self.call_id = call_id
@@ -361,6 +364,44 @@ class TeammateAgent(Agent):
         if len(options) > 1:
             return f"{plan.name}: {ways}. Shown on screen."
         return f"{plan.name}: ${price:g} al mes. Shown on screen."
+
+    @function_tool
+    async def ready_to_sign_up(self, context: RunContext, plan: str = "", payment: str = "") -> str:
+        """They said yes to your close (or didn't say no). Hand off to the rep's tablet, where they type their
+        own full name, phone number and email. As you call it, say only "¡Perfecto!" ("Perfect!" in English);
+        it gives you the rest. Don't ask for those details out loud.
+
+        Args:
+            plan: The plan they chose. Blank if there is only one.
+            payment: How they'll pay if they said, for example "autopay checking" or "debit card". Blank if not yet.
+        """
+        rep = self.playbook.rep_name
+        chosen = self.playbook.find_plan(plan or "")
+        if not chosen and len(self.playbook.plans) > 1:
+            return "Not yet: ask which plan they want, then call ready_to_sign_up again."
+        chosen = chosen or (self.playbook.plans[0] if self.playbook.plans else None)
+        option = self.playbook.find_price_option(chosen, payment) if payment.strip() and chosen else None
+        if payment.strip() and chosen and chosen.price_options and not option:
+            ways = ", ".join(o.how_es or o.how for o in chosen.price_options)
+            return f"'{payment}' isn't a way to pay in your facts ({ways}). Ask which one, or ask {rep}."
+        fields = {"plan": chosen.name if chosen else plan.strip(), "payment": option.how if option else "",
+                  "monthly": option.price_monthly if option else None}
+        first = not self.lead
+        self.lead = fields
+        # the tablet holds their details; this row is only the rep's own count of sign-ups
+        if not await self.store({"call_id": self.call_id, "user_id": self.user_id, "kind": "signup", **fields}):
+            logger.warning("couldn't record the sign-up (the tablet still has their details)")
+        await self.phone.send("signup_ready", **fields)  # the phone buzzes: hand them the tablet
+        if not first:
+            return "Noted. Carry on where you were."
+        return self._call_over(
+            "",
+            (f"Ahorita {rep} le pasa la tableta para que ponga su nombre completo, su número y su correo.",
+             f"{rep} will hand you the tablet so you can type in your full name, number and email."),
+            "say in English: \"They're in! Can you hand them the tablet for their name, number and email?\" "
+            f"Then, while they type, stay quiet; help if they ask something. When {rep} asks you to have them enter "
+            "something else (date of birth, Social Security number, ID), tell them to type it on the tablet. If "
+            "they tell you how they'll pay, call ready_to_sign_up again with it.")
 
     @function_tool
     async def save_lead(

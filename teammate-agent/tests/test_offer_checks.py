@@ -179,7 +179,7 @@ def test_instructions_limit_what_unverified_english_can_change():
     text = PB.instructions(NOW)
     assert "Only your facts, a \"[rep]\" line, or Quentin's answer to your check-in can add or change a price" in text
     assert "Right now it is Monday, October 19, 2026, 3:00 PM" in text
-    assert "customer_confirmed true" in text
+    assert "ready_to_sign_up" in text  # Quentin's customers type their details on his tablet
 
 
 # ---- the daily price check

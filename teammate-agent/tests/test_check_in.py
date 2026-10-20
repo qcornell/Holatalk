@@ -1,6 +1,7 @@
 """Ana checking in with the rep, and the $35 autopay / $45 debit pricing."""
 
 import asyncio
+import json
 import os
 import sys
 from datetime import datetime
@@ -14,7 +15,10 @@ from number_check import amounts_in_text, expand_allowed, unexpected_amounts  # 
 from playbook import Playbook  # noqa: E402
 
 PB = Playbook.from_file(Path(__file__).resolve().parents[1] / "sample_playbook.json")
-TEXT = PB.instructions(datetime(2026, 10, 19, 15, 0))
+TEXT = PB.instructions(datetime(2026, 10, 19, 15, 0))  # Quentin's setup: customers type on his tablet
+VOICE_PB = Playbook.from_dict({**json.loads((Path(__file__).resolve().parents[1] / "sample_playbook.json")
+                                            .read_text(encoding="utf-8")), "signupBy": "voice"})
+VOICE_TEXT = VOICE_PB.instructions(datetime(2026, 10, 19, 15, 0))  # reps without a tablet: Ana takes them
 
 
 class FakePhone:
@@ -64,17 +68,61 @@ def test_amounts_the_rep_says_in_english_are_heard():
 # ---- the check-in
 
 def test_instructions_explain_the_check_in():
-    assert "# Checking in with Quentin" in TEXT
-    assert "Un momentito, déjeme hablar con Quentin." in TEXT
-    assert "Anything else you" in TEXT and "\"No, that's it\"" in TEXT
-    assert '"[rep]"' in TEXT
+    for text in (TEXT, VOICE_TEXT):
+        assert "# Checking in with Quentin" in text
+        assert "Un momentito, déjeme hablar con Quentin." in text
+        assert "\"No, that's it\"" in text
+        assert '"[rep]"' in text
+    assert "Anything else you" in VOICE_TEXT
+    assert "They're in! Can you hand them the tablet" in TEXT
 
 
 def test_ana_may_ask_about_ids_but_never_takes_the_numbers():
-    rules = TEXT.split("# Hard rules")[1]
+    rules = VOICE_TEXT.split("# Hard rules")[1]
     assert "You may ASK whether they have a Social Security number" in rules
     assert "Never ask them to say the number itself" in rules
-    assert "Never ask for Social Security numbers" not in TEXT  # the old blanket rule is gone
+    assert "Never ask for Social Security numbers" not in VOICE_TEXT  # the old blanket rule is gone
+
+
+def test_with_a_tablet_they_type_their_details_and_never_say_them():
+    rules = " ".join(TEXT.split("# Hard rules")[1].split())
+    assert 'call ready_to_sign_up, saying only "¡Perfecto!" as you call it' in rules
+    assert "They type their own full name, phone number and email on Quentin's tablet" in rules
+    assert "don't ask for those out loud and don't read anything back" in rules
+    assert '"Ahora ponga su fecha de nacimiento en la tableta, por favor."' in rules
+    assert "Never ask them to SAY a Social Security, ITIN, ID, card, bank account or routing number" in rules
+    assert "save_lead" not in TEXT and "Read the phone number back" not in TEXT
+    flat = " ".join(TEXT.split())
+    assert "Right after the close line, call ready_to_sign_up" in flat
+    assert "¿Cuál es su nombre completo?" not in flat  # no asking for the name out loud
+    assert "¿Cuál es su nombre completo?" in " ".join(VOICE_TEXT.split())
+
+
+def test_ready_to_sign_up_hands_off_to_the_tablet():
+    async def run():
+        phone, store = FakePhone(), FakeStore()
+        a = agent.TeammateAgent(PB, phone, call_id="room-1", user_id="quentin", store=store)
+        a.wait_for_rep = lambda: None
+        out = await a.ready_to_sign_up(None, payment="credit card")
+        assert "isn't a way to pay" in out and store.rows == []
+        out = await a.ready_to_sign_up(None)
+        assert ('"Ahorita Quentin le pasa la tableta para que ponga su nombre completo, su número y '
+                'su correo. Quentin, are you there?"') in out
+        assert "They're in! Can you hand them the tablet for their name, number and email?" in out
+        assert phone.sent == [("signup_ready", {"plan": "Internet", "payment": "", "monthly": None})]
+        row = store.rows[0]
+        assert row["kind"] == "signup" and row["call_id"] == "room-1" and "name" not in row  # no details here
+        again = await a.ready_to_sign_up(None, payment="autopay checking")
+        assert again.startswith("Noted") and phone.sent[-1][1]["monthly"] == 35 and len(store.rows) == 2
+    asyncio.run(run())
+
+
+def test_a_failed_tally_never_holds_up_the_sale():
+    async def run():
+        a = agent.TeammateAgent(PB, FakePhone(), store=FakeStore(ok=False))
+        a.wait_for_rep = lambda: None
+        assert "hand them the tablet" in await a.ready_to_sign_up(None)
+    asyncio.run(run())
 
 
 class FakeStore:

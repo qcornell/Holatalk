@@ -98,13 +98,18 @@ CLOSING = [
     "Close warm and sure, and move right into the details:",
     "  - \"Entonces, si le interesa, nomás ocupamos un buen nombre, número y correo, y se lo dejamos listo.\"",
     "  - \"Si le interesa, se lo podemos dejar listo hoy mismo. ¡Le va a encantar!\"",
-    "  - \"Va a estar mucho más rápido en su tele y en todos sus aparatos. ¿Cuál es su nombre completo?\"",
+    "  - \"Va a estar mucho más rápido en su tele y en todos sus aparatos.{ask_name_es}\"",
     "  In English mode: \"So if you're interested, we just need a good name, number and email and we'll get it set "
     "up for you.\" / \"We can get it set up for you today, you'll love it!\" / \"It'll be so much faster on your TV and "
-    "devices. What's your full name?\"",
-    "Right after the close line, ask for the first detail (their full name) and keep going: number, then email.",
+    "devices.{ask_name_en}\"",
+    "{after_close}",
     "If they hesitate or raise a concern, handle it with the ladder, then close again the same way.",
 ]
+AFTER_CLOSE = {
+    "voice": "Right after the close line, ask for the first detail (their full name) and keep going: number, then email.",
+    "tablet": "Right after the close line, call ready_to_sign_up: they type their name, number and email on {rep}'s "
+              "tablet. Don't ask for those out loud.",
+}
 
 # The probing ladder seasoned reps use.
 LADDER = [
@@ -198,9 +203,13 @@ HARD_STOPS = [
 ]
 
 
-def sales_skills_text(rep: str, company: str, price: str) -> str:
+def sales_skills_text(rep: str, company: str, price: str, signup_by: str = "tablet") -> str:
     """The sales-skills section of Hola's instructions, with the rep's name and price filled in."""
     fill = {"rep": rep, "company_part": f", de {company}" if company else "", "price": price}
+    voice = signup_by == "voice"
+    close_fill = {"ask_name_es": " ¿Cuál es su nombre completo?" if voice else "",
+                  "ask_name_en": " What's your full name?" if voice else "",
+                  "after_close": AFTER_CLOSE["voice" if voice else "tablet"].format(rep=rep)}
     ladder = "\n".join(f"{i}. {step}" for i, step in enumerate(LADDER, 1))
     probes = " ".join(PROBE_QUESTIONS)
     offs = "\n".join(
@@ -208,7 +217,7 @@ def sales_skills_text(rep: str, company: str, price: str) -> str:
     )
     stops = "\n".join(f"- {s}" for s in HARD_STOPS)
     value = "\n".join(f"- {r}" for r in VALUE_RULES)
-    closing = "\n".join(r if r.startswith("  ") else f"- {r}" for r in CLOSING)
+    closing = "\n".join((r if r.startswith("  ") else f"- {r}").format(**close_fill) for r in CLOSING)
     types = "\n\n".join(
         f"{i}. {t['name']}\nSigns: {t['signs']}\n"
         + "\n".join(f"   - {str(step).format(**fill)}" for step in t["steps"])  # type: ignore[union-attr]

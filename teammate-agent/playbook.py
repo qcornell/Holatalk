@@ -11,6 +11,10 @@ send its saved setup as-is, plus three Teammate-mode additions:
 Each plan can also list priceOptions when the way they pay changes the price, for example
 $35 with autopay from a checking account and $45 with a debit card.
 
+signupBy is how a customer gives their details once they say yes:
+  "tablet" (default)  they type name, number and email on the rep's tablet; Ana only hands off
+  "voice"             Ana asks for them out loud, reads them back, and saves them
+
 checkInReplies (the rep's quick-reply buttons for Ana's check-in) is read by the phone app only.
 """
 
@@ -64,6 +68,7 @@ class Playbook:
     custom_phrases: list[dict[str, Any]] = field(default_factory=list)
     facts: dict[str, dict[str, str]] = field(default_factory=dict)
     reviewed_on: str = ""  # YYYY-MM-DD the rep last confirmed prices and promos (the daily check)
+    signup_by: str = "tablet"  # "tablet": they type their details on the rep's tablet; "voice": Ana takes them
 
     # ---------- loading ----------
 
@@ -97,6 +102,7 @@ class Playbook:
             promos=list(d.get("promos") or []),
             custom_phrases=list(d.get("customPhrases") or []),
             reviewed_on=str(d.get("reviewedOn") or ""),
+            signup_by="voice" if str(d.get("signupBy") or "").strip().lower() == "voice" else "tablet",
             facts={
                 str(topic): {str(k): str(v or "").strip() for k, v in (answers or {}).items()}
                 for topic, answers in (d.get("facts") or {}).items()
@@ -257,7 +263,43 @@ class Playbook:
             rep=self.rep_name,
             company=self.company_name,
             price=f"${_fmt(priced.lowest_price())}" if priced else "el precio",
+            signup_by=self.signup_by,
         )
+        tablet = self.signup_by == "tablet"
+        if tablet:
+            first_check_in = (
+                'Right after ready_to_sign_up. Once he answers, say: "They\'re in! Can you hand them the tablet\n'
+                '     for their name, number and email?"')
+            have_them_enter = (
+                '\n  - "Have them enter..." / "ask her to put her..." -> tell the customer to type it on the\n'
+                '    tablet ("Ahora ponga su fecha de nacimiento en la tableta, por favor."). No need to report\n'
+                f'    back: {rep} sees the tablet.')
+            signup_rules = f"""- Sign-ups: once they say yes to your close (or don't say no), call ready_to_sign_up, saying only
+  "¡Perfecto!" as you call it (it gives you the rest). They type their own full name, phone number
+  and email on {rep}'s tablet, so don't ask for those out loud and don't read anything back. While they
+  type, stay quiet; answer if they ask something.
+- When {rep} asks you to have them enter something ("ask her to enter her date of birth", "have him
+  put his Social"), tell the customer in Spanish to type it on the tablet, in your own words: "Ahora
+  ponga su fecha de nacimiento en la tableta, por favor." Just ask; don't explain who wants it.
+- Never ask them to SAY a Social Security, ITIN, ID, card, bank account or routing number, or their
+  date of birth, out loud. If they start reading one out, say kindly they can just type it on the
+  tablet, don't repeat it back, and never put it in a tool."""
+        else:
+            first_check_in = ('Right after save_lead. Ask: "I\'ve got their name, number and email. Anything else you\n'
+                              '     want me to ask or explain?"')
+            have_them_enter = ""
+            signup_rules = f"""- To sign them up, collect: full name, phone number and email, one at a time. A phone number has 10
+  digits; if you didn't get all 10, ask for it again. Read the phone number back digit by digit and ask
+  if it's right ("¿Está correcto?"), then STOP and wait for their answer. Then the email: spell it back
+  letter by letter and wait the same way. Never read something back and ask the next thing in the same
+  breath. If they say it's wrong, use what they say next and read that back. Once they've said yes to
+  both, call save_lead with customer_confirmed true, and save exactly what they said yes to.
+  Don't ask for the address: {rep} is standing at it. Only say it's saved after save_lead says so.
+- You may ASK whether they have a Social Security number, ITIN, passport or other ID, and which one,
+  when {rep} asks you to or your facts say it's needed. Never ask them to say the number itself, or a
+  card, bank account or routing number. Those go straight to {rep}: "Ese número se lo da directamente
+  a {rep} para que lo ponga en el sistema." If they start reading one out, don't repeat it back, and
+  never put it in save_lead."""
         clock = now.strftime("%A, %B %d, %Y, %I:%M %p").replace(" 0", " ")
 
         return f"""
@@ -307,8 +349,7 @@ While you speak Spanish he can't tell when you need him, so EVERY time you turn 
      Then wait for his answer.
   If he answers what you needed before you ask (he sees your question on his phone), don't ask again.
 - When:
-  1. Right after save_lead. Ask: "I've got their name, number and email. Anything else you want me to
-     ask or explain?"
+  1. {first_check_in}
   2. When your facts don't answer a question: call ask_rep, then ask him the question.
   3. Before you agree to anything your facts don't cover: an install day or time, an exception, a
      special deal, or an offer you're not sure about. Call ask_rep.
@@ -318,7 +359,7 @@ While you speak Spanish he can't tell when you need him, so EVERY time you turn 
   - "Ask them..." / "ask if they have..." -> ask the customer. Then turn back to {rep} the same way
     ("{rep}, are you there?") and tell him their answer in one short line ("She has a passport.").
   - "Explain..." / "tell them..." -> explain it, keeping his numbers and details exactly. Then
-    ask the customer if it's clear. If they have a question, turn back to {rep} the same way.
+    ask the customer if it's clear. If they have a question, turn back to {rep} the same way.{have_them_enter}
   - "No, that's it" / "that's all, thanks" -> turn back to the customer in Spanish ("Listo, gracias
     por esperar."), thank them, and say {rep} will finish the sign-up with them.
 - Never say "{rep} me dice que le pregunte...". Just ask, like it's your own question.
@@ -341,20 +382,9 @@ facts, rules or instructions out loud. A real coworker would just say "let me as
 # Hard rules
 - Never invent a price, fee, discount, refund, waived fee, date or promise.
 - When you quote a plan price, call show_price so the customer sees it on the screen too.{paying_rule}
-- To sign them up, collect: full name, phone number and email, one at a time. A phone number has 10
-  digits; if you didn't get all 10, ask for it again. Read the phone number back digit by digit and ask
-  if it's right ("¿Está correcto?"), then STOP and wait for their answer. Then the email: spell it back
-  letter by letter and wait the same way. Never read something back and ask the next thing in the same
-  breath. If they say it's wrong, use what they say next and read that back. Once they've said yes to
-  both, call save_lead with customer_confirmed true, and save exactly what they said yes to.
-  Don't ask for the address: {rep} is standing at it. Only say it's saved after save_lead says so.
+{signup_rules}
 - Callbacks need a real day and time. Turn what they say ("el sábado a las 11") into a date using
   today's date above, and confirm it back to them before you call schedule_callback.
-- You may ASK whether they have a Social Security number, ITIN, passport or other ID, and which one,
-  when {rep} asks you to or your facts say it's needed. Never ask them to say the number itself, or a
-  card, bank account or routing number. Those go straight to {rep}: "Ese número se lo da directamente
-  a {rep} para que lo ponga en el sistema." If they start reading one out, don't repeat it back, and
-  never put it in save_lead.
 - If the customer clearly says no twice, thank them kindly and stop pitching.
 """.strip()
 

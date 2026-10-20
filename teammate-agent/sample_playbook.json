@@ -3,6 +3,7 @@
   "assistantName": "Ana",
   "companyName": "",
   "reviewedOn": "",
+  "signupBy": "tablet",
   "pitch": "Ofrecemos internet aquí en el área por solo $35 al mes. Si le interesa, normalmente solo necesitamos su nombre, un número de teléfono y su correo, y se lo dejamos listo. La instalación es gratis y no hay contrato. ¿Ya tiene una tele inteligente?",
   "plans": [
     {
@@ -31,7 +32,8 @@
   "promos": [],
   "customPhrases": [],
   "checkInReplies": [
-    "Ask if they have an SSN or passport",
+    "Have them enter their date of birth",
+    "Have them enter their Social Security number",
     "Explain: $35 with autopay from checking, $45 with debit",
     "No, that's it, thank you"
   ],
