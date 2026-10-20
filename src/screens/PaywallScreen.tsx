@@ -58,7 +58,11 @@ export default function PaywallScreen({ onSubscribed }: PaywallScreenProps) {
         }
       });
 
-      const prod = await getProduct();
+      // Apple can be slow or silent; show the screen with the default price rather than spin
+      const prod = await Promise.race([
+        getProduct(),
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), 15000)),
+      ]);
       setProduct(prod);
     } catch (e: any) {
       console.warn('[Paywall] init failed:', e?.message);
@@ -70,14 +74,30 @@ export default function PaywallScreen({ onSubscribed }: PaywallScreenProps) {
   const handleSubscribe = useCallback(async () => {
     if (purchasing) return;
     setPurchasing(true);
+    // Apple's purchase sheet sometimes never answers; don't leave the button spinning forever.
+    const giveUp = setTimeout(() => {
+      setPurchasing(false);
+      Alert.alert(
+        "Apple didn't respond",
+        'Please try again. If you already started your trial, tap Restore Purchase.',
+      );
+    }, 90000);
     try {
       await purchaseSubscription();
-      // Result handled by purchase listener in connectStore
+      clearTimeout(giveUp);
+      // The purchase can come back here instead of through the listener: check for it directly.
+      if (await restorePurchases()) {
+        setPurchasing(false);
+        onSubscribed();
+        return;
+      }
+      setPurchasing(false); // cancelled, or still pending (the listener finishes it if it comes later)
     } catch (e: any) {
+      clearTimeout(giveUp);
       setPurchasing(false);
       Alert.alert('Error', 'Could not complete purchase. Please try again.');
     }
-  }, [purchasing]);
+  }, [purchasing, onSubscribed]);
 
   const handleRestore = useCallback(async () => {
     if (restoring) return;
