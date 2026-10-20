@@ -89,7 +89,7 @@ class FakeStore:
 
 def make_agent(ok=True):
     phone, store = FakePhone(), FakeStore(ok)
-    a = agent.TeammateAgent(PB, phone, call_id="room-1", user_id="max", store=store)
+    a = agent.TeammateAgent(PB, phone, call_id="room-1", user_id="quentin", store=store)
     a.wait_for_rep = lambda: None  # no timers in tests
     return a, phone, store
 
@@ -99,7 +99,8 @@ def test_save_lead_saves_first_then_checks_in_once():
         a, phone, store = make_agent()
         out = await a.save_lead(None, "María López", "(979) 555-0142", "maria@ejemplo.com", True,
                                 payment="debit card")
-        assert "Quentin, I've got their name, number and email" in out
+        assert "'Quentin, are you there?' and stop talking" in out
+        assert out.index("are you there") < out.index("I've got their name, number and email")
         assert [k for k, _ in phone.sent] == ["lead", "check_in"]
         assert phone.sent[0][1]["status"] == "saved"
         assert phone.sent[0][1]["fields"]["monthly"] == 45
@@ -172,7 +173,8 @@ def test_ask_rep_is_asked_out_loud_in_english():
         a = agent.TeammateAgent(PB, phone)
         a.wait_for_rep = lambda: None
         out = await a.ask_rep(None, "Is there a deposit?")
-        assert "Then ask Quentin in English" in out and "'Quentin, Is there a deposit?'" in out
+        assert "Déjeme confirmarlo con Quentin" in out and "'Quentin, are you there?'" in out
+        assert out.index("are you there") < out.index("'Is there a deposit?'")
         assert phone.sent == [("ask_rep", {"question": "Is there a deposit?"})]
     asyncio.run(run())
 
@@ -209,7 +211,67 @@ def test_rep_lines_are_recognized_as_english():
         "Ask if they have a Social Security number or a passport.",
         "Explain: $35 a month with autopay from a checking account, $45 with a debit card.",
         "Yeah ask her what time works",
+        "I'm here.", "Go ahead.", "Yep", "Yeah, what's up?",
     ]:
         assert agent.looks_english(line), line
     for line in ["Sí, tengo pasaporte.", "¿Y cuánto es con tarjeta?", "No, gracias, estoy bien."]:
         assert not agent.looks_english(line), line
+
+
+# ---- calling Quentin over before talking to him
+
+def test_instructions_call_him_over_every_time():
+    section = TEXT.split("# Checking in with Quentin")[1].split("# ")[0]
+    assert "EVERY time you turn from the customer" in section
+    assert '"Quentin, are you there?" Then stop talking and wait' in section
+    assert "skip \"are you there?\"" in section  # not when he just spoke to her
+    assert "Quentin, are you\n    there?" in TEXT  # also before asking him about English
+
+
+def test_calls_rep_spots_are_you_there():
+    yes = ["Quentin, are you there?", "Un momentito. Quentin, are you there?", "Hey Quentin, you there?",
+           "Quentin, are you still there?", "Are you there, Quentin?", "QUENTIN ARE YOU THERE"]
+    no = ["Quentin?", "Déjeme hablar con Quentin.", "Are you there?", "Quentin will be right there."]
+    for line in yes:
+        assert agent.calls_rep(line, "Quentin"), line
+    for line in no:
+        assert not agent.calls_rep(line, "Quentin"), line
+
+
+def test_the_wait_starts_when_she_says_are_you_there():
+    said = []
+
+    class FakeSession:
+        def generate_reply(self, **kw):
+            said.append(kw["instructions"])
+
+    class QuietAgent(agent.TeammateAgent):
+        session = FakeSession()
+
+    async def run():
+        agent.REP_WAIT_SECONDS = 0.05
+        phone = FakePhone()
+        a = QuietAgent(PB, phone)
+        assert not a.waiting_for_rep
+        assert a.ana_said("Un momentito, déjeme hablar con Quentin. Quentin, are you there?")
+        assert a.waiting_for_rep
+        # he answers "yeah": no nudge, and his next English line still counts as him
+        a.heard_rep()
+        await asyncio.sleep(0.12)
+        assert said == [] and a.waiting_for_rep
+        assert agent.who_said("No deposit, tell her no deposit.", a.waiting_for_rep)[1]
+        # back with the customer: her Spanish doesn't start a new wait
+        assert not a.ana_said("No hay depósito.")
+        a._talk_until = 0
+        assert not a.waiting_for_rep
+
+        # he doesn't answer: "Quentin?" once (phone buzzes again), then she carries on, no loop
+        a.rep_heard_at = 0
+        a.ana_said("Quentin, are you there?")
+        await asyncio.sleep(0.07)
+        assert said[-1].endswith("'Quentin?'") and phone.sent == [("rep_nudge", {})]
+        a.ana_said("Quentin, are you still there?")  # her nudge line doesn't restart the clock
+        await asyncio.sleep(0.07)
+        assert "carry on" in said[-1] and len(said) == 2
+        assert not a.waiting_for_rep
+    asyncio.run(run())

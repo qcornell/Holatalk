@@ -32,7 +32,7 @@ def test_blank_answers_are_listed_as_unknown_not_invented():
     assert "Autopay (required / optional / not offered)" not in unknown
 
 
-def test_max_pitch_and_facts():
+def test_rep_pitch_and_facts():
     pb = Playbook.from_file(SAMPLE)
     text = pb.instructions(datetime(2026, 10, 19, 15, 0))
     assert "por solo $35 al mes" in pb.pitch and "¿Ya tiene una tele inteligente?" in pb.pitch

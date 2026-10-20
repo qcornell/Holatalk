@@ -37,10 +37,10 @@ Use headphones for this test, so Hola doesn't hear itself through your speakers.
    then speak English as the rep ("tell her install is Saturday"). Try a wrong price on purpose
    ("¿no era $30?") to see the price check work. Each sign-up you finish is added to `leads.jsonl`.
 6. Try the check-in: as the customer, say yes and give a name, number and email. Ana says
-   "Un momentito, déjeme hablar con Quentin" and asks you in English if there's anything else. Answer
-   as the rep, for example "ask if they have a Social Security number or a passport", "explain it's
-   $35 with autopay from checking or $45 with debit", or "no, that's it, thank you". Stay quiet
-   once to hear her say "Quentin?" and then carry on.
+   "Un momentito, déjeme hablar con Quentin", then "Quentin, are you there?" and waits. Say "yeah"
+   and she asks if there's anything else. Answer as the rep, for example "ask if they have a Social
+   Security number or a passport", "explain it's $35 with autopay from checking or $45 with debit",
+   or "no, that's it, thank you". Stay quiet once to hear her say "Quentin?" and then carry on.
 
 ## Compare gpt-realtime-2.1 and GPT-Live-1
 
@@ -65,7 +65,8 @@ Messages arrive on the LiveKit data channel, topic `hola`, as JSON:
 | `lead` | after the details are confirmed and the save finished, and again if the payment choice changes | `status` (saved or not_saved), `fields`: name, phone, email, plan, payment, monthly (blank until they choose how to pay) |
 | `check_in` | right after the first `lead`: Ana is asking you "anything else?" | `reason` |
 | `ask_rep` | when the playbook has no answer (Ana also asks you out loud) | `question` |
-| `rep_nudge` | you didn't answer a check-in for 15 s (buzz the phone) | none |
+| `calling_rep` | Ana just said "Quentin, are you there?" because she needs you (buzz the phone) | none |
+| `rep_nudge` | you didn't answer for 10 s after "are you there?", so she said your name again (buzz again) | none |
 | `flag` | when something Hola said doesn't match the facts (she corrects herself out loud) | `said`, `problem` |
 | `callback` | a spouse, roommate or owner must decide | `status`, `name`, `phone`, `when` (as said), `at` (date and time), `decision_maker` |
 | `review_prices` | the playbook wasn't checked today (the daily price check) | `reviewed_on` |
@@ -111,11 +112,16 @@ Server logs show only message types, never names, numbers or what was said.
 
 Like a real interpreter, Ana steps aside and talks to you in English, then goes back to the customer:
 
+- Every time she turns to you, she tells the customer in Spanish first, then calls you in English:
+  "Quentin, are you there?" Your phone buzzes. She waits for your "yeah" before asking, so you never
+  miss a question buried in Spanish. If you don't answer in 10 s she says "Quentin?" once, then
+  goes back to the customer.
 - After she saves the name, number and email: "Un momentito, déjeme hablar con Quentin." then
-  "Quentin, I've got their name, number and email. Anything else you want me to ask or explain?"
+  "Quentin, are you there?" and, once you answer, "I've got their name, number and email. Anything
+  else you want me to ask or explain?"
 - When the customer asks something your playbook doesn't answer, she asks you the question out loud.
 - Your answer is for her, not a line to read out: "ask if they have an SSN or passport" makes her ask,
-  then tell you the answer in English. "No, that's it" sends her back to the customer to wrap up.
+  then call you back ("Quentin, are you there?") and tell you the answer in English. "No, that's it" sends her back to the customer to wrap up.
 - She may ask whether they have an SSN, ITIN, passport or other ID, but never asks them to say the
   number, or a card or bank number. Those go straight to you.
 - She also checks in before agreeing to anything your facts don't cover (an install time, an exception).

@@ -203,7 +203,9 @@ def test_transcription_settings_fit_the_model():
 def test_ana_switches_to_english_when_the_rep_asks():
     text = PB.instructions(NOW)
     assert "If Quentin asks you to speak English" in text and "switch right away" in text
-    assert "Quentin, they'd like English. Do you want to take it, or should I keep going in English?" in text
+    flat = " ".join(text.split())
+    assert ('"Quentin, are you there?" and wait. When he answers: "They\'d like English. Do you want to take '
+            'it, or should I keep going in English?"') in flat
     assert "Always answer the customer in Spanish" not in text
 
 

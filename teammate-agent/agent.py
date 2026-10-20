@@ -68,7 +68,8 @@ VOICE = os.getenv("VOICE", "marin")
 CAPTION_MODEL = os.getenv("CAPTION_MODEL", "gpt-4o-mini")
 TRANSCRIBE_MODEL = os.getenv("TRANSCRIBE_MODEL", "gpt-transcribe")
 SILENCE_SECONDS = float(os.getenv("SILENCE_SECONDS", "30"))
-REP_WAIT_SECONDS = float(os.getenv("REP_WAIT_SECONDS", "15"))  # then Ana says "Quentin?" once, then carries on
+REP_WAIT_SECONDS = float(os.getenv("REP_WAIT_SECONDS", "10"))  # after "Quentin, are you there?": then "Quentin?" once, then carries on
+REP_TALK_SECONDS = float(os.getenv("REP_TALK_SECONDS", "25"))  # once he answers her, his English counts as him this long
 MAX_MINUTES = float(os.getenv("MAX_MINUTES", "20"))
 TIMEZONE = os.getenv("TIMEZONE", "America/Chicago")
 PHONE_TOPIC = "hola"
@@ -131,7 +132,8 @@ class Captioner:
 _EN = {"the", "and", "you", "is", "are", "tell", "her", "him", "ask", "we", "it", "to", "can", "what", "how",
        "she", "he", "with", "from", "that", "that's", "this", "have", "has", "if", "they", "them", "their",
        "yes", "yeah", "okay", "ok", "thanks", "thank", "explain", "of", "for", "my", "your", "do", "does",
-       "don't", "need", "about", "all", "just", "so", "will", "please", "or", "in", "on", "at", "it's", "anything"}
+       "don't", "need", "about", "all", "just", "so", "will", "please", "or", "in", "on", "at", "it's", "anything",
+       "i'm", "here", "go", "ahead", "yep", "yup", "what's", "up", "sure", "hey", "uh", "huh", "listening"}
 _ES = {"el", "la", "los", "las", "que", "es", "y", "de", "por", "para", "usted", "sí", "si", "mi", "su",
        "cuánto", "cuanto", "en", "un", "una", "con", "del", "lo", "le", "se", "nos", "pero", "bien", "gracias",
        "está", "tiene", "tengo", "quiero", "aquí", "ahorita", "más", "muy", "ya", "también", "cómo", "qué", "porque"}
@@ -177,6 +179,15 @@ def parse_callback(when_iso: str, now: datetime) -> datetime | str:
     return at
 
 
+def calls_rep(text: str, rep: str) -> bool:
+    """True when Ana's line calls the rep over: "Quentin, are you there?" (or "Are you there, Quentin?")."""
+    if not rep:
+        return False
+    name = re.escape(rep)
+    there = r"(?:are\s+)?you\s+(?:still\s+)?there"
+    return bool(re.search(rf"\b{name}\b\W{{0,4}}(?:hey\W+)?{there}|{there}\W{{0,4}}{name}\b", text, re.I))
+
+
 def who_said(text: str, waiting_for_rep: bool) -> tuple[str, bool, bool]:
     """(clean text, is_rep, english). The rep is certain for a [rep] line from his phone, and likely
     for English that answers Ana's check-in. Other English could be a bilingual customer."""
@@ -216,49 +227,83 @@ class TeammateAgent(Agent):
         self.store = store  # async (record) -> bool; True only once it is really saved
         self.lead: dict[str, Any] = {}
         self.rep_heard_at = 0.0  # last time the rep answered (out loud or from his phone)
-        self._waiting: asyncio.Task | None = None
+        self._waiting: asyncio.Task | None = None  # Ana called the rep and is waiting for him to answer
+        self._nudged = False      # she already said his name a second time
+        self._talk_until = 0.0    # he answered her: his English counts as him until then
 
     async def on_enter(self) -> None:
         self.session.generate_reply(
             instructions="Start now: say your first words exactly as written. After they answer, run the pitch."
         )
 
-    # ---- waiting on the rep after a check-in
+    # ---- calling the rep over ("Quentin, are you there?") and waiting for him
+
+    @property
+    def _calling(self) -> bool:
+        return bool(self._waiting and not self._waiting.done())
 
     @property
     def waiting_for_rep(self) -> bool:
-        return bool(self._waiting and not self._waiting.done())
+        """Ana has called the rep over, or is in the middle of talking with him."""
+        return self._calling or time.monotonic() < self._talk_until
 
     def heard_rep(self) -> None:
-        self.rep_heard_at = time.monotonic()
+        now = time.monotonic()
+        if self.waiting_for_rep:  # he answered her: keep listening for his next line too
+            self._talk_until = now + REP_TALK_SECONDS
+        self.rep_heard_at = now
+        if self._calling:
+            self._waiting.cancel()
 
     def wait_for_rep(self) -> None:
-        """After Ana asks the rep something: if he says nothing, she says his name once, then carries on."""
-        if self._waiting and not self._waiting.done():
+        """Ana is calling the rep. Start the clock (again) from now: if he says nothing, she says his name
+        once more, then turns back to the customer."""
+        if self._calling:
+            if self._nudged:
+                return  # she already said his name twice; let her carry on
             self._waiting.cancel()
+        self._nudged = False
         self._waiting = asyncio.create_task(self._nudge_rep(time.monotonic()))
+
+    def ana_said(self, text: str) -> bool:
+        """Ana finished a line. True when it called the rep over ("Quentin, are you there?"). The wait is
+        timed from the end of her line, so he gets the full time to answer."""
+        called = calls_rep(text, self.playbook.rep_name)
+        if called and time.monotonic() - self.rep_heard_at < 3:
+            return called  # he's already answering
+        if called or self._calling:
+            self.wait_for_rep()
+        return called
 
     async def _nudge_rep(self, asked_at: float) -> None:
         rep = self.playbook.rep_name
         steps = [
-            f"{rep} hasn't answered you. Say his name once, in English: '{rep}?'",
+            f"{rep} hasn't answered you. Say his name once more, in English: '{rep}?'",
             f"{rep} is busy. Turn back to the customer in Spanish, thank them for waiting, and carry on. "
-            f"If they were waiting on an answer, say {rep} will answer it in a moment.",
+            f"If they were waiting on an answer, say {rep} will answer it in a moment. When he answers, go back to it.",
         ]
         for i, step in enumerate(steps):
             await asyncio.sleep(REP_WAIT_SECONDS)
             if self.rep_heard_at > asked_at:
                 return
             if i == 0:
-                await self.phone.send("rep_nudge")  # the phone buzzes
+                self._nudged = True
+                await self.phone.send("rep_nudge")  # the phone buzzes again
             try:
                 self.session.generate_reply(instructions=step)
             except RuntimeError as e:  # the call already ended
                 logger.debug("nudge skipped: %s", e)
                 return
 
+    def _turn_to_rep(self, spanish: str, then: str) -> str:
+        """How Ana turns from the customer to the rep: Spanish to the customer, then his name in English,
+        because he can't tell when her Spanish is meant for him."""
+        rep = self.playbook.rep_name
+        return (f"Tell the customer in Spanish: '{spanish}' Then say in English: '{rep}, are you there?' and stop "
+                f"talking. When he answers, {then}")
+
     async def on_exit(self) -> None:
-        if self._waiting and not self._waiting.done():
+        if self._calling:
             self._waiting.cancel()
 
     # ---- tools
@@ -344,8 +389,10 @@ class TeammateAgent(Agent):
         ok = await self.store({"call_id": self.call_id, "user_id": self.user_id, "kind": "signup", **fields})
         if not ok:
             await self.phone.send("lead", status="not_saved", fields=fields)
-            return (f"NOT saved: the save didn't go through. Don't tell the customer it's saved. Tell {rep} in "
-                    f"English: '{rep}, the save didn't go through. Can you write down their info?' Then carry on.")
+            self.wait_for_rep()
+            return "NOT saved: the save didn't go through. Don't tell the customer it's saved. " + self._turn_to_rep(
+                "Un momentito, por favor.",
+                "say in English: 'The save didn't go through. Can you write down their info?' Then carry on.")
         first_save = not self.lead
         self.lead = fields
         await self.phone.send("lead", status="saved", fields=fields)
@@ -353,10 +400,10 @@ class TeammateAgent(Agent):
             return "Updated and saved. Carry on where you were."
         await self.phone.send("check_in", reason="sign-up saved")
         self.wait_for_rep()
-        return (f"Saved. Now check in with {rep}: tell the customer in Spanish 'Perfecto, ya quedó. Un momentito, "
-                f"déjeme hablar con {rep}.' Then ask {rep} in English: '{rep}, I've got their name, number and "
-                "email. Anything else you want me to ask or explain?' Then wait for his answer. If they tell you "
-                "how they'll pay later, call save_lead again with it.")
+        return f"Saved. Now check in with {rep}. " + self._turn_to_rep(
+            f"Perfecto, ya quedó. Un momentito, déjeme hablar con {rep}.",
+            "say in English: 'I've got their name, number and email. Anything else you want me to ask or "
+            "explain?' Then wait for his answer. If they tell you how they'll pay later, call save_lead again with it.")
 
     @function_tool
     async def ask_rep(self, context: RunContext, question: str) -> str:
@@ -369,9 +416,10 @@ class TeammateAgent(Agent):
         await self.phone.send("ask_rep", question=question)
         self.wait_for_rep()
         rep = self.playbook.rep_name
-        return (f"Tell the customer in Spanish: 'Buena pregunta. Déjeme confirmarlo con {rep}.' Then ask {rep} "
-                f"in English, in one short line: '{rep}, {question}' Then wait. When he answers, tell the "
-                "customer in Spanish, using exactly what he said.")
+        return self._turn_to_rep(
+            f"Buena pregunta. Déjeme confirmarlo con {rep}.",
+            f"ask him in one short English line: '{question}' (If he already answered it, don't ask again.) "
+            "Then wait. When he answers, tell the customer in Spanish, using exactly what he said.")
 
     @function_tool
     async def schedule_callback(
@@ -396,11 +444,13 @@ class TeammateAgent(Agent):
         record = {"call_id": self.call_id, "user_id": self.user_id, "kind": "callback", "name": name.strip(),
                   "phone": digits, "callback_at": at.isoformat(), "decision_maker": decision_maker.strip()}
         if not await self.store(record):
-            rep = self.playbook.rep_name
             await self.phone.send("callback", status="not_saved", name=name.strip(), phone=digits,
                                   when=when_spoken.strip(), at=at.isoformat())
-            return (f"NOT saved: the save didn't go through. Tell {rep} in English to write down the callback, "
-                    "then repeat the day and time back to the customer.")
+            self.wait_for_rep()
+            return "NOT saved: the save didn't go through. " + self._turn_to_rep(
+                "Un momentito, por favor.",
+                "say in English: 'The callback didn't save. Can you write it down?' Then repeat the day and time "
+                "back to the customer.")
         await self.phone.send("callback", status="saved", name=name.strip(), phone=digits, when=when_spoken.strip(),
                               at=at.isoformat(), decision_maker=decision_maker.strip())
         return (f"Saved for {at.strftime('%A %B %d at %I:%M %p')}. Repeat the day and time back to them in Spanish, "
@@ -556,6 +606,8 @@ async def entrypoint(ctx: JobContext) -> None:
             recent.append(f"{label}: {clean}")
             spawn(caption("rep" if is_rep or english else "customer", clean, verified=is_rep))
         elif item.role == "assistant":
+            if agent.ana_said(text):  # "Quentin, are you there?": buzz his phone
+                spawn(phone.send("calling_rep"))
             spawn(caption("hola", text))
             spawn(check_offer(text, list(recent)))
             recent.append(f"Ana: {text}")
