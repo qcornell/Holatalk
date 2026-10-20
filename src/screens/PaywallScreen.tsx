@@ -175,7 +175,7 @@ export default function PaywallScreen({ onSubscribed, assistantName = 'Ana', mod
                     ) : null}
                   </View>
                   <Text style={s.planMeta}>
-                    {p.minutes} {assistantName} minutes a month · about {doors(p.minutes)} conversations
+                    {p.minutes} minutes of calls a month · about {doors(p.minutes)} conversations
                   </Text>
                 </View>
                 <View style={{ alignItems: 'flex-end' }}>
@@ -204,7 +204,7 @@ export default function PaywallScreen({ onSubscribed, assistantName = 'Ana', mod
           <View style={s.priceBlock}>
             <Text style={s.priceMain}>1 week free</Text>
             <Text style={s.priceSub}>
-              {TRIAL_MINUTES} {assistantName} minutes to try, then {plan.price} a month
+              {TRIAL_MINUTES} minutes to try, then {plan.price} a month
             </Text>
           </View>
         ) : null}
