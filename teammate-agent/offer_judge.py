@@ -100,11 +100,12 @@ def request_args(model: str, messages: list[dict]) -> dict:
 
 
 class OfferJudge:
-    def __init__(self, client=None) -> None:
+    def __init__(self, client=None, on_usage=None) -> None:
         if client is None:
             from openai import AsyncOpenAI
             client = AsyncOpenAI()
         self.client = client
+        self.on_usage = on_usage  # (model, usage) -> None, for the cost meter
 
     async def check(self, line: str, facts: str, rep_said: list[str], recent: list[str]) -> dict | None:
         model = os.getenv("JUDGE_MODEL") or DEFAULT_MODEL  # read here so .env counts
@@ -112,6 +113,8 @@ class OfferJudge:
             r = await self.client.chat.completions.create(
                 **request_args(model, build_messages(line, facts, rep_said, recent))
             )
+            if self.on_usage and getattr(r, "usage", None) is not None:
+                self.on_usage(model, r.usage)
             return parse_verdict(r.choices[0].message.content or "", line)
         except Exception as e:  # a failed check never stops the call
             logger.warning("offer judge failed: %s", type(e).__name__)

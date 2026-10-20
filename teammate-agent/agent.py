@@ -41,12 +41,14 @@ from livekit.agents import (
     function_tool,
 )
 from livekit.agents.llm import ChatMessage
+from livekit.agents.metrics import RealtimeModelMetrics
 from livekit.plugins import openai
 from livekit.plugins.openai.realtime import ResponsesDelegationOptions
 from openai import AsyncOpenAI
 from openai.types.realtime import AudioTranscription, RealtimeReasoning
 from openai.types.realtime.realtime_audio_input_turn_detection import SemanticVad
 
+from costs import CostMeter
 from leads import store_lead
 from number_check import amounts_in_text, expand_allowed, payment_pairing_errors, unexpected_amounts
 from offer_judge import OfferJudge, worth_checking
@@ -100,8 +102,9 @@ class PhoneBridge:
 class Captioner:
     """Turns each line of the conversation into an English caption for the rep."""
 
-    def __init__(self) -> None:
+    def __init__(self, on_usage=None) -> None:
         self.client = AsyncOpenAI()
+        self.on_usage = on_usage  # (model, usage) -> None, for the cost meter
 
     async def to_english(self, text: str) -> str:
         if looks_english(text):
@@ -117,6 +120,8 @@ class Captioner:
                 ],
                 max_tokens=200,
             )
+            if self.on_usage and getattr(r, "usage", None) is not None:
+                self.on_usage(CAPTION_MODEL, r.usage)
             return (r.choices[0].message.content or text).strip()
         except Exception as e:
             logger.warning("caption translation failed: %s", e)
@@ -473,8 +478,10 @@ server = AgentServer()
 async def entrypoint(ctx: JobContext) -> None:
     playbook, meta = load_playbook(ctx)
     phone = PhoneBridge(ctx)
-    captions = await asyncio.to_thread(Captioner)  # building these clients takes ~0.5 s; keep it off the audio loop
-    judge = await asyncio.to_thread(OfferJudge)
+    meter = CostMeter(voice_model=MODEL_NAME, transcribe_model="" if ENGINE == "live" else TRANSCRIBE_MODEL)
+    # building these clients takes ~0.5 s; keep it off the audio loop
+    captions = await asyncio.to_thread(Captioner, lambda m, u: meter.add_chat("captions", m, u))
+    judge = await asyncio.to_thread(OfferJudge, None, lambda m, u: meter.add_chat("price checks", m, u))
     started = time.monotonic()
     tasks: set[asyncio.Task] = set()
     console = ctx.is_fake_job()
@@ -579,7 +586,9 @@ async def entrypoint(ctx: JobContext) -> None:
         if ending["done"]:
             return
         ending["done"] = True
-        await phone.send("ended", reason=reason, seconds=round(time.monotonic() - started))
+        seconds = time.monotonic() - started
+        known = sum(v for v in meter.breakdown(seconds).values() if v is not None)
+        await phone.send("ended", reason=reason, seconds=round(seconds), cost_usd=round(known, 4))
         session.shutdown()
         ctx.shutdown(reason=reason)
 
@@ -596,6 +605,11 @@ async def entrypoint(ctx: JobContext) -> None:
         await asyncio.sleep(12)
         await end("time_limit")
 
+    @session.on("metrics_collected")
+    def _on_metrics(ev) -> None:
+        if isinstance(ev.metrics, RealtimeModelMetrics):
+            meter.add_realtime(ev.metrics)
+
     async def record_usage() -> None:
         await log_session(user_id=user_id, room=call_id, seconds=round(time.monotonic() - started),
                           model=MODEL_NAME, lead_saved=bool(agent.lead))
@@ -603,9 +617,14 @@ async def entrypoint(ctx: JobContext) -> None:
     async def usage_every_minute() -> None:
         while True:
             await asyncio.sleep(60)
+            logger.info("cost so far: %s", meter.summary(time.monotonic() - started))
             await record_usage()
 
-    ctx.add_shutdown_callback(record_usage)
+    async def final_report() -> None:
+        logger.info("CALL COST: %s", meter.summary(time.monotonic() - started))
+        await record_usage()
+
+    ctx.add_shutdown_callback(final_report)
     await session.start(agent=agent, room=ctx.room)
     if playbook.needs_review(today.date().isoformat()):
         spawn(phone.send("review_prices", reviewed_on=playbook.reviewed_on))
