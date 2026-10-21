@@ -10,6 +10,7 @@ import type { DayStats } from './stats';
 import type { PlanStatus } from './account';
 import { resetsOn } from './account';
 import { C } from './ui';
+import { OWNER_BUILD } from './owner';
 
 const ANA = require('../../assets/teammate/ana.png');
 
@@ -55,6 +56,11 @@ export default function HomeScreen({
               </Text>
               {sub ? <Text style={st.sub} numberOfLines={1}>{sub}</Text> : null}
             </View>
+            {OWNER_BUILD ? (
+              <View style={st.owner} accessibilityLabel="Owner build">
+                <Text style={st.ownerText}>Owner</Text>
+              </View>
+            ) : null}
             <Pressable onPress={onSettings} hitSlop={6} accessibilityRole="button" accessibilityLabel="Settings" style={({ pressed }) => [st.gear, pressed && { opacity: 0.7 }]}>
               <GearIcon />
             </Pressable>
@@ -99,7 +105,7 @@ export default function HomeScreen({
                     ]}
                   />
                 </View>
-                {plan.minutesLeft / Math.max(1, plan.minutesInPlan) < 0.15 ? (
+                {!OWNER_BUILD && plan.minutesLeft / Math.max(1, plan.minutesInPlan) < 0.15 ? (
                   <Pressable onPress={onPlans} accessibilityRole="button" hitSlop={6} style={st.morePill}>
                     <Text style={st.moreText}>{plan.minutesLeft === 0 ? 'Get more minutes' : 'Running low. See plans'}</Text>
                   </Pressable>
@@ -198,6 +204,8 @@ const st = StyleSheet.create({
   title: { fontSize: 30, fontWeight: '800', color: C.onDark, letterSpacing: -0.6 },
   sub: { fontSize: 15, color: C.onDark3 },
   gear: { width: 44, height: 44, borderRadius: 22, backgroundColor: C.chip, alignItems: 'center', justifyContent: 'center' },
+  owner: { height: 28, paddingHorizontal: 11, borderRadius: 14, borderWidth: 1, borderColor: '#1F5E48', backgroundColor: '#0F1F19', justifyContent: 'center' },
+  ownerText: { fontSize: 13, fontWeight: '700', color: C.accent, letterSpacing: 0.2 },
   hero: { backgroundColor: C.raised, borderWidth: 1, borderColor: C.raisedLine, borderRadius: 24, padding: 18, gap: 16 },
   anaRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   ana: { width: 56, height: 56, borderRadius: 28 },

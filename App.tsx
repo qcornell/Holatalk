@@ -1,8 +1,9 @@
 /**
  * Hola D2D: Ana, an AI Spanish-speaking teammate on speakerphone at the door.
  *
- * First time: setup (what you sell, about you, your prices), then the free-week paywall.
+ * First time: setup (what you sell, about you, your prices), then the plans.
  * After that: home, with Call Ana, today's counts, and Convo and Teach Me for inside the house.
+ * The owner build (src/main/owner.ts) skips the plans and uses the owner code instead.
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { AppState, StatusBar, View } from 'react-native';
@@ -25,6 +26,7 @@ import { AccountError, planStatus, usingTestConnection } from './src/main/accoun
 import type { PlanStatus } from './src/main/account';
 import type { DayStats } from './src/main/stats';
 import { C } from './src/main/ui';
+import { OWNER_BUILD } from './src/main/owner';
 import PaywallScreen from './src/screens/PaywallScreen';
 import ConvoScreen from './src/screens/ConvoScreen';
 import TeachMeScreen from './src/screens/TeachMeScreen';
@@ -35,7 +37,7 @@ export default function App() {
   const [booting, setBooting] = useState(true);
   const [settings, setSettings] = useState<TeammateSettings | null>(null);
   const [older, setOlder] = useState<{ repName?: string; companyName?: string }>({});
-  const [subscribed, setSubscribed] = useState<boolean | null>(null);
+  const [subscribed, setSubscribed] = useState<boolean | null>(OWNER_BUILD ? true : null);
   const [profile, setProfile] = useState<RepProfile | null>(null);
   const [stats, setStats] = useState<DayStats | null>(null);
   const [screen, setScreen] = useState<Screen>('home');
@@ -53,9 +55,11 @@ export default function App() {
       setStats(today);
       setBooting(false);
     })();
-    checkSubscriptionStatus()
-      .then((active) => setSubscribed(active))
-      .catch(() => setSubscribed(false)); // no network on first launch: show the paywall, Restore works later
+    if (!OWNER_BUILD) {
+      checkSubscriptionStatus()
+        .then((active) => setSubscribed(active))
+        .catch(() => setSubscribed(false)); // no network on first launch: show the paywall, Restore works later
+    }
     warmupTranslation(); // Convo's "add a phrase" translates; wake the function up early
     return () => {
       disconnectStore();
@@ -76,6 +80,11 @@ export default function App() {
     if (usingTestConnection(s)) {
       setPlan(null);
       setPlanNote('Testing connection: minutes not counted');
+      return;
+    }
+    if (OWNER_BUILD && !s.connection.accessCode.trim()) {
+      setPlan(null);
+      setPlanNote('Add your owner code in Settings to start calling');
       return;
     }
     try {

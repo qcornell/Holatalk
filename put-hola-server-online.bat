@@ -23,13 +23,15 @@ echo Step 2 of 4: the tables that hold plans and minutes
 call %SB% db push || goto :fail
 
 echo.
-echo Step 3 of 4: the LiveKit keys, from teammate-agent\.env
+echo Step 3 of 4: the LiveKit keys and your owner code, from teammate-agent\.env
 for /f "usebackq eol=# tokens=1,* delims==" %%a in ("teammate-agent\.env") do set "ENV_%%a=%%b"
 if not defined ENV_LIVEKIT_API_SECRET (
   echo teammate-agent\.env doesn't have the LiveKit keys yet.
   goto :fail
 )
 call %SB% secrets set "LIVEKIT_URL=%ENV_LIVEKIT_URL%" "LIVEKIT_API_KEY=%ENV_LIVEKIT_API_KEY%" "LIVEKIT_API_SECRET=%ENV_LIVEKIT_API_SECRET%" --project-ref %REF% || goto :fail
+if defined ENV_TEAMMATE_ACCESS_CODES call %SB% secrets set "TEAMMATE_ACCESS_CODES=%ENV_TEAMMATE_ACCESS_CODES%" --project-ref %REF% || goto :fail
+if defined ENV_TEAMMATE_MONTHLY_MINUTES call %SB% secrets set "TEAMMATE_MONTHLY_MINUTES=%ENV_TEAMMATE_MONTHLY_MINUTES%" --project-ref %REF% || goto :fail
 
 echo.
 echo Step 4 of 4: the start-live function
@@ -38,6 +40,9 @@ call %SB% functions deploy start-live --no-verify-jwt --use-api --project-ref %R
 echo.
 echo The server is online.
 echo.
+if defined ENV_TEAMMATE_ACCESS_CODES echo Your owner code, for the owner build on your phone: %ENV_TEAMMATE_ACCESS_CODES%
+if defined ENV_TEAMMATE_ACCESS_CODES echo In the app: Settings, Owner code. Type it exactly as shown.
+if defined ENV_TEAMMATE_ACCESS_CODES echo.
 echo Last thing, so Ana counts minutes: Notepad and Supabase are opening.
 echo In Supabase, copy the service_role key (Project Settings, API Keys, Reveal).
 echo In Notepad, paste it after SUPABASE_SERVICE_ROLE_KEY= then save and close.

@@ -16,9 +16,17 @@
     "production": {
       "autoIncrement": true,
       "channel": "production"
+    },
+    "owner": {
+      "extends": "production",
+      "channel": "owner",
+      "env": {
+        "EXPO_PUBLIC_OWNER_BUILD": "1"
+      }
     }
   },
   "submit": {
-    "production": {}
+    "production": {},
+    "owner": {}
   }
 }

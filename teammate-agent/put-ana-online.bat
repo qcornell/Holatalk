@@ -24,7 +24,7 @@ lk cloud auth || goto :fail
 echo.
 echo Step 2 of 2: sending Ana to the cloud
 rem Ana's settings and keys from .env, except LiveKit's own keys (the cloud has those) and PC-only files
-powershell -NoProfile -Command "Get-Content .env | Where-Object { $_ -match '^[A-Z_]+=.+' -and $_ -notmatch '^(LIVEKIT_|PLAYBOOK_FILE=|LEADS_FILE=)' } | Set-Content cloud-secrets.env"
+powershell -NoProfile -Command "Get-Content .env | Where-Object { $_ -match '^[A-Z_]+=.+' -and $_ -notmatch '^(LIVEKIT_|PLAYBOOK_FILE=|LEADS_FILE=|TEAMMATE_ACCESS_CODES=|TEAMMATE_MONTHLY_MINUTES=)' } | Set-Content cloud-secrets.env"
 if exist livekit.toml (
   lk agent deploy --secrets-file cloud-secrets.env
 ) else (

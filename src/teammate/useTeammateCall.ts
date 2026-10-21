@@ -107,7 +107,7 @@ async function connectionFor(s: TeammateSettings, roomName: string): Promise<{ s
   const identity = `rep-${s.deviceId}`;
   const userId = `device-${s.deviceId}`;
   const { tokenServerId } = s.connection;
-  if (!tokenServerId.trim()) {
+  if (!usingTestConnection(s)) {
     const ticket = await startCall(s);
     return { serverUrl: ticket.serverUrl, participantToken: ticket.participantToken };
   }

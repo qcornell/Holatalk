@@ -8,6 +8,7 @@ import { industry } from '../teammate/industries';
 import type { SetupSection } from '../teammate/TeammateSetupScreen';
 import { CardIcon, ChatIcon, HelpIcon, IndustryIcon, LinkIcon, ListIcon, PersonIcon, TabletIcon, TagIcon } from '../teammate/icons';
 import { C, Card, DarkHeader, GroupLabel, Row, Sheet } from './ui';
+import { OWNER_BUILD } from './owner';
 
 export const TERMS_URL = 'https://sites.google.com/view/holad2dtranslator/terms';
 export const PRIVACY_URL = 'https://sites.google.com/view/holad2dtranslator/home';
@@ -98,7 +99,16 @@ export default function SettingsScreen({
 
           <GroupLabel>Account</GroupLabel>
           <Card style={st.group}>
-            <Row icon={<CardIcon size={20} color={muted} />} label="Your plan" value={planName || 'See plans'} onPress={onPlans} />
+            {OWNER_BUILD ? (
+              <Row
+                icon={<CardIcon size={20} color={muted} />}
+                label="Owner code"
+                value={settings.connection.accessCode ? 'Set' : 'Not set'}
+                onPress={() => onEdit({ title: 'Owner code', sections: ['owner'] })}
+              />
+            ) : (
+              <Row icon={<CardIcon size={20} color={muted} />} label="Your plan" value={planName || 'See plans'} onPress={onPlans} />
+            )}
             <Row
               icon={<LinkIcon size={20} color={muted} />}
               label="Connection (testing)"
@@ -109,7 +119,7 @@ export default function SettingsScreen({
             <Row icon={<HelpIcon size={20} color={muted} />} label="Privacy Policy" onPress={() => Linking.openURL(PRIVACY_URL)} last />
           </Card>
           <View style={{ height: 24 }} />
-          <Text style={st.version}>Hola D2D</Text>
+          <Text style={st.version}>{OWNER_BUILD ? 'Hola D2D · Owner build' : 'Hola D2D'}</Text>
         </ScrollView>
       </Sheet>
     </SafeAreaView>

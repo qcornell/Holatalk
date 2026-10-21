@@ -23,7 +23,8 @@ import { INDUSTRIES, defaultPitch, industry as industryPack } from './industries
 import { ChevronDownIcon, IndustryIcon, MicIcon, PlusIcon, TabletIcon, TrashIcon } from './icons';
 import { Button, C, Choice, DarkHeader, Sheet } from '../main/ui';
 
-export type SetupSection = 'you' | 'industry' | 'pitch' | 'prices' | 'signup' | 'replies' | 'questions' | 'connection';
+/** 'owner' (the owner code) only shows when asked for, in the owner build's Settings. */
+export type SetupSection = 'you' | 'industry' | 'pitch' | 'prices' | 'signup' | 'replies' | 'questions' | 'connection' | 'owner';
 
 const ALL: SetupSection[] = ['you', 'industry', 'pitch', 'prices', 'signup', 'replies', 'questions', 'connection'];
 
@@ -339,6 +340,21 @@ export default function TeammateSetupScreen({
                 {v.connection.startUrl ? (
                   <Field label="Access code" value={v.connection.accessCode} onChange={(t) => set({ connection: { ...v.connection, accessCode: t.trim() } })} keyboard="url" />
                 ) : null}
+              </Section>
+            ) : null}
+
+            {show('owner') ? (
+              <Section
+                title="Owner code"
+                sub="It's shown in the window that put the Hola server online. Calls on this phone use it instead of an App Store plan."
+              >
+                <Field
+                  value={v.connection.accessCode}
+                  onChange={(t) => set({ connection: { ...v.connection, accessCode: t.trim() } })}
+                  keyboard="url"
+                  placeholder="owner-…"
+                  hint="Your minutes reset on the 1st of each month."
+                />
               </Section>
             ) : null}
           </ScrollView>

@@ -31,9 +31,12 @@ export class AccountError extends Error {
   }
 }
 
-/** True while testing through LiveKit's development token server (set in Settings, Connection). */
+/**
+ * True while testing through LiveKit's development token server (set in Settings, Connection).
+ * An access code (the owner code) always goes through the Hola server instead.
+ */
 export function usingTestConnection(s: TeammateSettings): boolean {
-  return !!s.connection.tokenServerId.trim();
+  return !!s.connection.tokenServerId.trim() && !s.connection.accessCode.trim();
 }
 
 async function post(action: 'status' | 'start', s: TeammateSettings): Promise<any> {
