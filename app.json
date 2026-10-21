@@ -8,6 +8,14 @@
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "plugins": [
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "buildReactNativeFromSource": true
+          }
+        }
+      ],
       "./plugins/withWhisperCpp",
       "expo-iap",
       "@livekit/react-native-expo-plugin",
