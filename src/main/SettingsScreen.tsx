@@ -6,7 +6,7 @@ import type { TeammateSettings } from '../teammate/settings';
 import { factsAnswered, priceChips } from '../teammate/settings';
 import { industry } from '../teammate/industries';
 import type { SetupSection } from '../teammate/TeammateSetupScreen';
-import { CardIcon, ChatIcon, HelpIcon, IndustryIcon, LinkIcon, ListIcon, PersonIcon, TabletIcon, TagIcon } from '../teammate/icons';
+import { CardIcon, ChatIcon, HelpIcon, IndustryIcon, LinkIcon, ListIcon, MicIcon, PersonIcon, TabletIcon, TagIcon } from '../teammate/icons';
 import { C, Card, DarkHeader, GroupLabel, Row, Sheet } from './ui';
 import { OWNER_BUILD } from './owner';
 
@@ -24,6 +24,8 @@ export default function SettingsScreen({
   onEdit,
   onPlans,
   planName,
+  aiConsent,
+  onAiInfo,
 }: {
   settings: TeammateSettings;
   onBack: () => void;
@@ -31,6 +33,9 @@ export default function SettingsScreen({
   onPlans: () => void;
   /** The rep's plan, when known */
   planName?: string;
+  /** Said yes to calls going to OpenAI and LiveKit */
+  aiConsent?: boolean;
+  onAiInfo?: () => void;
 }) {
   const pack = industry(settings.industry);
   const facts = factsAnswered(settings);
@@ -109,12 +114,17 @@ export default function SettingsScreen({
             ) : (
               <Row icon={<CardIcon size={20} color={muted} />} label="Your plan" value={planName || 'See plans'} onPress={onPlans} />
             )}
-            <Row
-              icon={<LinkIcon size={20} color={muted} />}
-              label="Connection (testing)"
-              value={settings.connection.tokenServerId || settings.connection.startUrl ? 'Set' : 'Not set'}
-              onPress={() => onEdit({ title: 'Connection', sections: ['connection'] })}
-            />
+            {OWNER_BUILD || settings.connection.tokenServerId || settings.connection.startUrl ? (
+              <Row
+                icon={<LinkIcon size={20} color={muted} />}
+                label="Connection (testing)"
+                value={settings.connection.tokenServerId || settings.connection.startUrl ? 'Set' : 'Not set'}
+                onPress={() => onEdit({ title: 'Connection', sections: ['connection'] })}
+              />
+            ) : null}
+            {onAiInfo ? (
+              <Row icon={<MicIcon size={20} color={muted} />} label="How calls work" value={aiConsent ? 'Allowed' : 'Not yet'} onPress={onAiInfo} />
+            ) : null}
             <Row icon={<HelpIcon size={20} color={muted} />} label="Terms of Use" onPress={() => Linking.openURL(TERMS_URL)} />
             <Row icon={<HelpIcon size={20} color={muted} />} label="Privacy Policy" onPress={() => Linking.openURL(PRIVACY_URL)} last />
           </Card>

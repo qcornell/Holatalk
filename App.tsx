@@ -27,11 +27,13 @@ import type { PlanStatus } from './src/main/account';
 import type { DayStats } from './src/main/stats';
 import { C } from './src/main/ui';
 import { OWNER_BUILD } from './src/main/owner';
+import AiConsentScreen from './src/main/AiConsentScreen';
+import { hasAiConsent, setAiConsent } from './src/main/consent';
 import PaywallScreen from './src/screens/PaywallScreen';
 import ConvoScreen from './src/screens/ConvoScreen';
 import TeachMeScreen from './src/screens/TeachMeScreen';
 
-type Screen = 'home' | 'call' | 'convo' | 'teach' | 'settings' | 'edit' | 'plans';
+type Screen = 'home' | 'call' | 'convo' | 'teach' | 'settings' | 'edit' | 'plans' | 'consent';
 
 export default function App() {
   const [booting, setBooting] = useState(true);
@@ -44,11 +46,14 @@ export default function App() {
   const [edit, setEdit] = useState<EditTarget | null>(null);
   const [plan, setPlan] = useState<PlanStatus | null>(null);
   const [planNote, setPlanNote] = useState('');
+  const [aiOk, setAiOk] = useState(false); // the rep said yes to calls going to OpenAI and LiveKit
+  const [consentFrom, setConsentFrom] = useState<'home' | 'settings'>('home');
 
   useEffect(() => {
     (async () => {
-      const [saved, oldSetup, rep, today] = await Promise.all([loadTeammateSettings(), loadSetup(), loadRepProfile(), loadToday()]);
+      const [saved, oldSetup, rep, today, ok] = await Promise.all([loadTeammateSettings(), loadSetup(), loadRepProfile(), loadToday(), hasAiConsent()]);
       setSettings(saved);
+      setAiOk(ok);
       // reps coming from the old translator keep their name and company
       if (oldSetup) setOlder({ repName: oldSetup.repName, companyName: oldSetup.companyName });
       setProfile(rep);
@@ -129,6 +134,24 @@ export default function App() {
       );
   } else if (screen === 'call') {
     body = <TeammateFlow settings={settings} onSave={save} onExit={callDone} onPlans={() => setScreen('plans')} />;
+  } else if (screen === 'consent') {
+    body = (
+      <AiConsentScreen
+        assistantName={settings.assistantName}
+        agreed={aiOk}
+        onAgree={async () => {
+          await setAiConsent(true);
+          setAiOk(true);
+          setScreen('call');
+        }}
+        onWithdraw={async () => {
+          await setAiConsent(false);
+          setAiOk(false);
+          setScreen('settings');
+        }}
+        onBack={() => setScreen(consentFrom)}
+      />
+    );
   } else if (screen === 'plans') {
     body = (
       <PaywallScreen
@@ -172,6 +195,11 @@ export default function App() {
         onBack={() => setScreen('home')}
         planName={plan ? (plan.trial ? 'Free week' : plan.plan) : undefined}
         onPlans={() => setScreen('plans')}
+        aiConsent={aiOk}
+        onAiInfo={() => {
+          setConsentFrom('settings');
+          setScreen('consent');
+        }}
         onEdit={(t) => {
           setEdit(t);
           setScreen('edit');
@@ -186,7 +214,11 @@ export default function App() {
         plan={plan}
         planNote={planNote}
         onPlans={() => setScreen('plans')}
-        onCall={() => setScreen('call')}
+        onCall={() => {
+          // the first call asks first (App Review 5.1.2(i)): calls go to OpenAI and LiveKit
+          setConsentFrom('home');
+          setScreen(aiOk ? 'call' : 'consent');
+        }}
         onConvo={() => setScreen('convo')}
         onTeachMe={() => setScreen('teach')}
         onSettings={() => setScreen('settings')}
