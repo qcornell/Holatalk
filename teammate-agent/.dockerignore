@@ -1,0 +1,14 @@
+# Kept out of Ana's cloud image: keys, customer details, and PC-only files
+.env
+.env.*
+!.env.example
+cloud-secrets.env
+leads.jsonl
+*.jsonl
+.venv/
+__pycache__/
+.pytest_cache/
+tests/
+*.bat
+*.ps1
+livekit.toml
