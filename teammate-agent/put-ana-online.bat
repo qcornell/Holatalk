@@ -16,9 +16,12 @@ echo Getting the LiveKit tool from LiveKit's GitHub page. About 40 MB.
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0get-lk.ps1" || goto :fail
 :have_lk
 
+rem Signed in already (the Hola project is saved): skip straight to sending Ana up
+"%LK%" project list 2>nul | findstr /i "hola" >nul && goto :signed_in
 echo.
 echo Step 1 of 2: sign in to LiveKit in the browser window, and pick the Hola project.
 "%LK%" cloud auth || goto :fail
+:signed_in
 
 echo.
 echo Step 2 of 2: sending Ana to the cloud
