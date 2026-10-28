@@ -134,7 +134,7 @@ export default function TeammateSetupScreen({
       <DarkHeader onBack={onBack} title={title} sub={show('questions') && sections.length === 1 ? 'Answer what you know. Blank ones, Ana asks you out loud.' : undefined} />
       <Sheet>
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
+          <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
             {sections.length > 2 ? (
               <Text style={s.lead}>Ana only says what's here. Leave anything blank and she'll ask you instead of guessing.</Text>
             ) : null}
@@ -172,7 +172,7 @@ export default function TeammateSetupScreen({
                 title="Prices"
                 sub={
                   pack.priceRequired
-                    ? 'If how they pay changes the price, add each way to pay.'
+                    ? "If how they pay changes the price, add each way to pay. With no price, Ana says you'll give them the quote."
                     : "Optional. With no price, Ana says you'll give them the quote."
                 }
               >
@@ -361,7 +361,7 @@ export default function TeammateSetupScreen({
           <View style={[s.footer, { paddingBottom: Math.max(insets.bottom, 12) + 8 }]}>
             {!canSave ? (
               <Text style={s.footerHint}>
-                {pack.priceRequired ? 'Ana needs your name, an opener and a price to go out.' : 'Ana needs your name and an opener to go out.'}
+                Ana needs your name and an opener to go out.
               </Text>
             ) : null}
             <Button label="Save" onPress={() => onSave(v)} disabled={!canSave} />

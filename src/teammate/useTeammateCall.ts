@@ -16,7 +16,8 @@ import { AccountError, startCall, usingTestConnection } from '../main/account';
 
 const TOPIC = 'hola';
 const AGENT_NAME = 'hola-teammate';
-const ANA_JOIN_SECONDS = 20;
+// a cloud agent waking from sleep can take 20-30 s to join; give her room before calling it a miss
+const ANA_JOIN_SECONDS = 45;
 
 export type Phase = 'connecting' | 'waiting' | 'live' | 'ended' | 'error';
 

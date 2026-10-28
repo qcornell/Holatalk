@@ -195,6 +195,7 @@ export function priceChips(s: TeammateSettings): string[] {
       out.push(`${money(plan.priceMonthly)}${per === 'month' ? '/mo' : suffix}`);
     }
   }
+  if (!out.length && s.plans.length) out.push('You quote the price');
   if (industryPack(s.industry).hasInstall) {
     out.push(s.installationFee ? `${money(s.installationFee)} install` : 'Free install');
     out.push(s.hasContract ? 'Contract' : 'No contract');
@@ -254,14 +255,19 @@ export function factsAnswered(s: TeammateSettings): { answered: number; total: n
   return { answered, total };
 }
 
-/** Ready to go out: a name, an opening line, and a price when the industry needs one. */
+/**
+ * Enough for Ana to go out: a name and an opener. Prices are optional everywhere; with none, Ana says
+ * the rep will go over the numbers (App Review couldn't finish setup when a price was required).
+ */
 export function isReady(s: TeammateSettings): boolean {
-  const pack = industryPack(s.industry);
-  if (!s.repName.trim() || !s.pitch.trim()) return false;
-  if (!pack.priceRequired) return true;
+  return !!s.repName.trim() && !!s.pitch.trim();
+}
+
+/** The industry usually has a price and none is set yet: worth a nudge, never a block. */
+export function missingPrice(s: TeammateSettings): boolean {
+  if (!industryPack(s.industry).priceRequired) return false;
   const plan = s.plans[0];
-  if (!plan) return false;
-  return plan.priceOptions.length ? plan.priceOptions.every((o) => o.priceMonthly > 0) : plan.priceMonthly > 0;
+  return !plan || !(plan.priceMonthly > 0 || plan.priceOptions.some((o) => o.priceMonthly > 0));
 }
 
 /** The playbook Ana reads, in the agent's format (see teammate-agent/sample_playbook.json). */

@@ -73,7 +73,8 @@ export default function OnboardingFlow({
     freeInstall: pack.hasInstall && v.installationFee === 0,
     noContract: pack.hasInstall && !v.hasContract,
   });
-  const pitch = ownPitch ?? generated;
+  // a cleared custom opener falls back to the suggested one, so Finish setup never goes dead
+  const pitch = ownPitch?.trim() ? ownPitch : generated;
 
   const finished = useMemo((): TeammateSettings => {
     const priced = rows.filter((r) => num(r.price) > 0);
@@ -100,7 +101,8 @@ export default function OnboardingFlow({
     return { ...v, plans, facts, pitch: pitch.trim(), reviewedOn: today() };
   }, [v, rows, planName, pitch, pack, invite]);
 
-  const ready = isReady(finished) && (v.industry !== 'ministry' || invite.when.trim().length > 0);
+  // only a name is needed (step 2 asks for it); prices, the invitation and the opener all have fallbacks
+  const ready = isReady(finished);
 
   if (step === 'welcome') return <Welcome onStart={() => setStep('industry')} />;
 
@@ -120,7 +122,7 @@ export default function OnboardingFlow({
               sub={v.industry === 'ministry' ? 'Ana introduces you and your church by name.' : 'Ana introduces you and the company by name.'}
             />
             <Sheet>
-              <ScrollView contentContainerStyle={st.sheetBody} keyboardShouldPersistTaps="handled">
+              <ScrollView contentContainerStyle={st.sheetBody} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
                 <Field
                   label="Your first name"
                   value={v.repName}
@@ -171,11 +173,11 @@ export default function OnboardingFlow({
               sub={v.industry === 'ministry' ? 'Ana only shares what you put here.' : "Ana only quotes what's here. You can change it any day."}
             />
             <Sheet>
-              <ScrollView contentContainerStyle={st.sheetBody} keyboardShouldPersistTaps="handled">
+              <ScrollView contentContainerStyle={st.sheetBody} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
                 {pack.per === 'none' ? (
                   <Card style={st.cardPad}>
                     <Field
-                      label="What and when"
+                      label="What and when (optional)"
                       value={invite.when}
                       onChangeText={(t) => setInvite((x) => ({ ...x, when: t }))}
                       placeholder="Sunday service, 10 AM"
@@ -239,7 +241,7 @@ export default function OnboardingFlow({
                       <PlusIcon color={C.green} />
                       <Text style={st.addText}>Add a price for another way to pay</Text>
                     </Pressable>
-                    {!pack.priceRequired ? <Text style={st.note}>Optional. With no price, Ana says you'll give them the quote.</Text> : null}
+                    <Text style={st.note}>Optional. With no price, Ana says you'll give them the quote.</Text>
                   </Card>
                 )}
 
