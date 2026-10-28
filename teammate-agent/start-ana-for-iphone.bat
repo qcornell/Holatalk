@@ -39,7 +39,7 @@ if defined MISSING (
   echo.
   echo Notepad is opening. Fill in these lines, then save and close Notepad:
   echo   OPENAI_API_KEY=      your OpenAI key
-  echo   LIVEKIT_URL=         from cloud.livekit.io, Settings, Keys (starts with wss://)
+  echo   LIVEKIT_URL=         from cloud.livekit.io, Settings, Keys - starts with wss://
   echo   LIVEKIT_API_KEY=     same page
   echo   LIVEKIT_API_SECRET=  same page
   echo.
