@@ -37,3 +37,4 @@ __pycache__/
 .pytest_cache/
 teammate-agent/cloud-secrets.env
 supabase/.temp/
+teammate-agent/railway-settings.env
